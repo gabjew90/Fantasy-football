@@ -1,43 +1,43 @@
 # expires: 2026-11-11
-"""Running backs on role vs creation, with four checks (the user's spec, 2026-10-12). A study, not a model:
-it changes nothing in the calculator (frozen to 2026-11-02, DECISIONS #245). The quadrant actions are the
-spec's reasoning about how the metrics behave; they are not backtested (the user's call: no backtest).
+"""Running backs on role vs creation (the user's spec, revised 2026-10-12). A study, not a model: it changes
+nothing in the calculator (frozen to 2026-11-02, DECISIONS #245). The quadrant actions are the spec's
+reasoning about how the metrics behave; they are not backtested (the user's call: no backtest).
 
 The chart
-- x, role: the average of route participation and inside-the-10 carry share, counting only games he played
-  alongside his team's current backfield, the team's last three games weighted double. No public feed has
-  route participation, so offensive snap share stands in for it (on the same 0-100% scale, which the 50%
-  lead-back cutoff needs; target share would not reach it). Inside-10 share is lumpy -- a team may have two
-  such carries in a month -- so it is pulled toward his carry share by K_I10 team inside-10 carries (which
-  brings his carry share in where his team has few such carries).
-  'Current backfield' = the team's backs with a median snap share of 25%+ over two or more games (a one-game
-  fill-in is not a backfield) who played in one of its last two games. A game in which one of them did not play is left out when that teammate's median snap share is at
-  least half the back's own (his role there was inflated by the absence); a minor teammate's absence does not
-  change a starter's role, so those games stay.
-- y, creation: missed tackles forced per touch -- Pro Football Reference's broken tackles on carries and
-  catches (close to, not the same as, PFF's count) -- this season, 50+ touches. A season's first weeks of
-  this rate barely repeat (split-half r near zero at an earlier check), so the checks matter.
-- cutoffs: role 50% (the clear lead back); creation at the median of the qualifying backs.
+- x, role (recent, because role changes fast): the average of route participation and inside-the-10 carry
+  share, counting only games he played alongside his team's current backfield, the team's last three games
+  weighted double. No public feed has route participation, so offensive snap share stands in for it (on the
+  same 0-100% scale the 50% cut needs). Inside-10 share is lumpy, so it is pulled toward his carry share by
+  K_I10 team inside-10 carries. 'Current backfield' = the team's backs with a median snap share of 25%+ over
+  two or more games who played in one of its last two games; a game one of them missed is left out when
+  his median snap share is at least half the back's own. A regular back's (median snap share 40%+) game in
+  which he played under half his own median AND then missed the team's next game or was listed Out or
+  Doubtful the next week is left out too (he left hurt; it is not his role). Cut at 50% (the clear lead back).
+- y, creation (slow, because talent changes slowly): broken tackles per touch -- Pro Football Reference's
+  count on carries and catches, close to but not PFF's 'missed tackles forced' -- over 2025 and 2026 to date,
+  pulled toward the qualifying backs' median rate by K pseudo-touches: (broken tackles + K x median) /
+  (touches + K). K is not chosen by hand: it is set from how much the rate repeats between 2025's two halves,
+  K = (average half-season touches) x (1 - r) / r, so the less the rate repeats, the harder a back is pulled
+  to the middle. Cut at the median of the qualifying backs. A back with under THIN_PRIOR touches in 2025
+  (mostly rookies) is flagged: his number rests on 2026 alone.
+- close call: how many broken tackles would move him across the creation line, on his own touches; within
+  CLOSE_EVENTS is marked. This replaces any confidence score.
+Qualifying: 2025 + 2026 touches >= MIN_TOUCHES and at least two role games this season.
 
-The checks, in order (each a column; together they set a confidence)
-1. Confirm creation: NGS percent of rushes over expected where NGS lists him, else PFR yards after contact
-   per carry. Above or below the qualifying backs' median, the same side as his creation or not; a
-   disagreement lowers confidence.
-2. Adjust for the line: no feed has run block win rate, so the team's Next Gen Stats expected yards per
-   carry stands in (frozen at the handoff, the back's vision not in it). A bad line (0.10+ below league)
-   strengthens a buy and softens a sell; a good line (0.10+ above) the opposite.
-3. Compare teammates: yards before contact per carry and broken tackles per touch against his team's other
-   backs with 10+ touches. A backup (role under 50%) who beats them on both is the strongest buy; a starter
-   who loses both is the strongest sell; read the other way round, a buy who loses both or a sell who wins
-   both is weaker (the spec's rule applied in reverse, a stated choice).
-4. Why the role is what it is: a current-backfield teammate on the latest week's injury report (or who
-   missed the team's latest game) is named with his status, unless he then played that week's game (a
-   pre-game Questionable he played through is not a reason); the report gives a weekly status, not a return date.
+Columns beside the chart, shown for judgement, not scored
+- creation context: NGS percent of rushes over expected (2026, where NGS lists him). Two unrelated median
+  splits disagree about half the time by construction, so it is context only.
+- line: the team's Next Gen Stats expected yards per carry against the league (no feed has run block win
+  rate); good / bad at 0.10 either side.
+- teammates: yards before contact per carry (2026, the same line) and creation against his team's other
+  backs with 10+ touches this season: wins both / loses both / split.
+- teammate out: a current-backfield teammate on the latest week's injury report (unless he then played that
+  week) or who missed the team's latest game, with his status; the report gives a status, not a return date.
 
-Weeks: role uses every week of play-by-play; creation and the PFR checks use the weeks PFR has posted for
-every game. A back is a running back by his latest weekly roster listing (fullbacks out); PFR and snap ids
-map to gsis ids through the rosters, and a back whose PFR carries miss his play-by-play carries by more than
-2 is left out and named. Carries leave out quarterback scrambles and kneels."""
+Data: role uses every week of 2026 play-by-play; the PFR measures use the weeks PFR has posted for every game
+(2026) and the whole 2025 regular season. A back is a running back by his latest weekly roster listing of each
+season (fullbacks out); PFR and snap ids map to gsis ids through the rosters; a back whose PFR carries miss his
+play-by-play carries by more than 2 has that season left out, named. Carries leave out QB scrambles and kneels."""
 
 from __future__ import annotations
 
@@ -55,6 +55,9 @@ from experiments import run_game_2x2_2026 as rg  # noqa: E402
 from props.calc import data  # noqa: E402
 
 SEASON = 2026
+PRIOR = 2025
+THIN_PRIOR = 50           # fewer 2025 touches than this: creation rests on 2026 alone
+CLOSE_EVENTS = 2          # within this many broken tackles of the creation line: a close call
 K_I10 = 5                 # team inside-10 carries' worth of pull toward his carry share
 RECENT_GAMES, RECENT_WEIGHT = 3, 2.0
 CORE_BACK = 0.25          # median snap share that makes a back part of a backfield
@@ -65,7 +68,6 @@ MIN_MATE_TOUCHES = 10
 COLS = ["game_id", "season", "week", "season_type", "posteam", "yardline_100", "rush_attempt", "pass_attempt", "sack",
         "two_point_attempt", "qb_kneel", "qb_scramble", "rusher_player_id", "receiver_player_id", "complete_pass"]
 ACTIONS = {(True, True): "Hold", (True, False): "Sell high", (False, True): "Buy low", (False, False): "Drop"}
-AGE = {"max_age_s": F.CURRENT_SEASON_MAX_AGE_S}
 
 
 def flag(s: pd.Series) -> pd.Series:
@@ -83,6 +85,7 @@ def full_pfr_weeks(p: pd.DataFrame, *pfr: pd.DataFrame) -> list[int]:
 
 
 def load(season: int) -> dict:
+    AGE = {"max_age_s": F.CURRENT_SEASON_MAX_AGE_S} if season == SEASON else {}
     p = pd.read_csv(F.nflverse("pbp", season, **AGE), usecols=COLS, low_memory=False)
     p = p[p["season_type"] == "REG"]
     rush = pd.read_csv(F.nflverse("pfr_adv_rush", season, **AGE))
@@ -136,6 +139,20 @@ def role(d: dict) -> tuple[pd.DataFrame, dict]:
         if missing:
             left_out.setdefault(names.get(row.gsis_id, row.gsis_id), []).append(
                 f"wk {row.week} (no {', '.join(names.get(m, m) for m in missing)})")
+    # left hurt: a regular back's game under half his median snaps, then a missed next game or Out/Doubtful next week
+    own_med = pl.groupby("gsis_id")["offense_pct"].transform("median")
+    inj = d["inj"]
+    serious = set(zip(inj.loc[inj["report_status"].isin(["Out", "Doubtful"]), "gsis_id"],
+                      inj.loc[inj["report_status"].isin(["Out", "Doubtful"]), "week"]))
+    hurt = []
+    for row, om in zip(pl.itertuples(), own_med):
+        nxt = [w for w in team_games.get(row.team, []) if w > row.week]
+        h = bool(om >= 0.40 and row.offense_pct < 0.5 * om and nxt
+                 and ((row.gsis_id, nxt[0]) not in seen or (row.gsis_id, nxt[0]) in serious))
+        hurt.append(h)
+        if h:
+            left_out.setdefault(names.get(row.gsis_id, row.gsis_id), []).append(f"wk {row.week} (left hurt, {100 * row.offense_pct:.0f}% of snaps)")
+    keep = [k and not h for k, h in zip(keep, hurt)]
     g = pl[keep].copy()
     rank = {(t, w): i for t, ws in team_games.items() for i, w in enumerate(reversed(ws))}
     g["wt"] = [RECENT_WEIGHT if rank.get((t, w), 99) < RECENT_GAMES else 1.0 for t, w in zip(g["team"], g["week"])]
@@ -157,13 +174,15 @@ def role(d: dict) -> tuple[pd.DataFrame, dict]:
     return b, {"current": current, "left_out": left_out}
 
 
-def creation(d: dict) -> tuple[pd.DataFrame, list]:
-    rbs, pw = d["rbs"], d["pfr_weeks"]
+def creation(d: dict, weeks=None) -> tuple[pd.DataFrame, list]:
+    """Per running back: touches, broken tackles, yards before/after contact, over PFR's full weeks (or a subset)."""
+    rbs, pw = d["rbs"], d["pfr_weeks"] if weeks is None else [w for w in d["pfr_weeks"] if w in set(weeks)]
     car = d["car"][d["car"]["week"].isin(pw) & d["car"]["rusher_player_id"].isin(rbs)]
     tgt = d["tgt"][d["tgt"]["week"].isin(pw) & d["tgt"]["receiver_player_id"].isin(rbs)]
     c = pd.DataFrame({"carries": car.groupby("rusher_player_id").size(),
                       "receptions": tgt.groupby("receiver_player_id")["complete_pass"].apply(lambda x: int(flag(x).sum()))}).fillna(0)
-    r, q = d["rush"].groupby("gsis_id"), d["rec"].groupby("gsis_id")
+    rush, rec = d["rush"][d["rush"]["week"].isin(pw)], d["rec"][d["rec"]["week"].isin(pw)]
+    r, q = rush.groupby("gsis_id"), rec.groupby("gsis_id")
     c["bt"] = r["rushing_broken_tackles"].sum().reindex(c.index).fillna(0) + q["receiving_broken_tackles"].sum().reindex(c.index).fillna(0)
     c["ybc_sum"] = r["rushing_yards_before_contact"].sum().reindex(c.index).fillna(0)
     c["yac_sum"] = r["rushing_yards_after_contact"].sum().reindex(c.index).fillna(0)
@@ -191,26 +210,44 @@ def latest_status(d: dict) -> dict:
             if (gid, wk) not in seen}                         # he played that week's game: the tag was pre-game
 
 
+def half_r(d: dict) -> tuple[float, float, int]:
+    """2025's first half vs second half: the broken-tackle rate's repeat r, average half touches, backs."""
+    wk = d["pfr_weeks"]
+    h1, _ = creation(d, wk[: len(wk) // 2])
+    h2, _ = creation(d, wk[len(wk) // 2:])
+    j = h1.join(h2, lsuffix="_a", rsuffix="_b", how="inner")
+    j = j[(j["touches_a"] >= 60) & (j["touches_b"] >= 60)]
+    return float(j["mtf_a"].corr(j["mtf_b"])), float((j["touches_a"] + j["touches_b"]).mean() / 2), len(j)
+
+
 def build() -> tuple[pd.DataFrame, dict]:
-    d = load(SEASON)
+    d, dp = load(SEASON), load(PRIOR)
     b, meta = role(d)
-    c, left = creation(d)
-    r = b.join(c[["touches", "bt", "mtf", "ybc", "yac", "pfr_carries"]], how="inner")
-    no_role = sorted(d["names"].get(i, i) for i in c.index[(c["touches"] >= MIN_TOUCHES) & ~c.index.isin(b.index)])
-    q = r[r["touches"] >= MIN_TOUCHES].copy()
-    mtf_mid = float(q["mtf"].median())
-    q["action"] = [ACTIONS[(x >= ROLE_CUT, y >= mtf_mid)] for x, y in zip(q["role"], q["mtf"])]
+    c_cur, left_cur = creation(d)
+    c_pri, left_pri = creation(dp)
+    cols = ["touches", "bt"]
+    pooled = c_cur[cols].add(c_pri[cols], fill_value=0)
+    r_half, half_t, n_half = half_r(dp)
+    k = half_t * (1 - r_half) / r_half if r_half > 0.02 else 50 * half_t      # no repeat at all: pull nearly to the middle
+    r = b[b["games"] >= 2].join(pooled.add_prefix("pool_"), how="inner")
+    r = r.join(c_cur[["touches", "bt", "ybc"]].add_prefix("cur_"), how="left")
+    r["prior_touches"] = c_pri["touches"].reindex(r.index).fillna(0)
+    q = r[r["pool_touches"] >= MIN_TOUCHES].copy()
+    q["raw"] = q["pool_bt"] / q["pool_touches"]
+    m = float(q["raw"].median())
+    q["creation"] = (q["pool_bt"] + k * m) / (q["pool_touches"] + k)
+    cut = float(q["creation"].median())
+    # broken tackles that would move him across the line on his own touches: solve (bt + x + k m) / (n + k) = cut
+    q["to_flip"] = cut * (q["pool_touches"] + k) - k * m - q["pool_bt"]
+    q["close_call"] = q["to_flip"].abs() <= CLOSE_EVENTS
+    q["thin"] = q["prior_touches"] < THIN_PRIOR
+    q["action"] = [ACTIONS[(x >= ROLE_CUT, y >= cut)] for x, y in zip(q["role"], q["creation"])]
 
-    # check 1: NGS percent of rushes over expected where listed, else yards after contact per carry
+    # context: NGS percent of rushes over expected (2026), shown, not scored
     ngs_rows = rg.load(SEASON)
-    ngs = ngs_rows.set_index("player_gsis_id")
-    q["pct_over_exp"] = ngs["rush_pct_over_expected"].reindex(q.index)
-    q["check_src"] = q["pct_over_exp"].notna().map({True: "% rushes over expected", False: "yards after contact"})
-    poe_mid, yac_mid = float(q["pct_over_exp"].median()), float(q["yac"].median())
-    side = [(p >= poe_mid) if pd.notna(p) else (y >= yac_mid) for p, y in zip(q["pct_over_exp"], q["yac"])]
-    q["check1_agrees"] = [bool(s == (m >= mtf_mid)) for s, m in zip(side, q["mtf"])]
+    q["pct_over_exp"] = ngs_rows.set_index("player_gsis_id")["rush_pct_over_expected"].reindex(q.index)
 
-    # check 2: the line (NGS team expected yards per carry vs league; run block win rate is not in any feed)
+    # the line (NGS team expected yards per carry vs league; run block win rate is not in any feed)
     tb, lg_mid, _ = rg.backs(ngs_rows)
     tt = rg.teams(tb, lg_mid)
     q["team_exp_ypc"] = q["team"].map(tt["exp_ypc"])
@@ -219,8 +256,10 @@ def build() -> tuple[pd.DataFrame, dict]:
     q["block_vs_league"] = q["team_exp_ypc"] - lg_mid
     q["line"] = ["good" if v >= LINE_BAND else "bad" if v <= -LINE_BAND else "average" for v in q["block_vs_league"]]
 
-    # check 3: teammates (10+ touches) on yards before contact and broken tackles per touch
-    pool = r[r["touches"] >= MIN_MATE_TOUCHES]
+    # teammates (10+ touches this season): 2026 yards before contact (same line) and creation
+    allr = r.copy()
+    allr["creation"] = (allr["pool_bt"] + k * m) / (allr["pool_touches"] + k)
+    pool = allr[allr["cur_touches"].fillna(0) >= MIN_MATE_TOUCHES]
     res, txt = [], []
     for gid, row in q.iterrows():
         mates = pool[(pool["team"] == row["team"]) & (pool.index != gid)]
@@ -228,51 +267,35 @@ def build() -> tuple[pd.DataFrame, dict]:
             res.append("")
             txt.append("")
             continue
-        my = mates["ybc"].dropna()                     # a teammate with catches but no carries has no before-contact rate
-        better = bool((row["ybc"] > my).all() and (row["mtf"] > mates["mtf"]).all())
-        worse = bool((row["ybc"] < my).all() and (row["mtf"] < mates["mtf"]).all())
+        my = mates["cur_ybc"].dropna()
+        better = bool((row["cur_ybc"] > my).all() and (row["creation"] > mates["creation"]).all())
+        worse = bool((row["cur_ybc"] < my).all() and (row["creation"] < mates["creation"]).all())
         res.append("wins both" if better else "loses both" if worse else "split")
-        txt.append(", ".join(f"{m} ({y:.2f} before contact, {100 * t:.1f} BT/100)" for m, y, t in
-                             zip(mates["name"], mates["ybc"], mates["mtf"])))
-    q["check3"], q["teammates"] = res, txt
+        txt.append(", ".join(f"{n} ({y:.2f} before contact, {100 * c:.1f} creation)" for n, y, c in
+                             zip(mates["name"], mates["cur_ybc"], mates["creation"])))
+    q["teammates_result"], q["teammates"] = res, txt
 
-    # check 4: is the role propped up by a current-backfield teammate's absence?
+    # teammate out
     status = latest_status(d)
-    team_last = d["played"].groupby("team")["week"].max()          # the latest week with snap counts posted
+    team_last = d["played"].groupby("team")["week"].max()
     seen = set(zip(d["played"]["gsis_id"], d["played"]["week"]))
     flags = []
     for gid, row in q.iterrows():
-        notes = []
-        for m in meta["current"].get(row["team"], []):
-            if m == gid:
-                continue
-            missed = (m, team_last.get(row["team"])) not in seen
-            if missed or m in status:
-                notes.append(f"{d['names'].get(m, m)}: {status.get(m, 'missed the latest game')}")
+        notes = [f"{d['names'].get(mm, mm)}: {status.get(mm, 'missed the latest game')}"
+                 for mm in meta["current"].get(row["team"], [])
+                 if mm != gid and ((mm, team_last.get(row["team"])) not in seen or mm in status)]
         flags.append("; ".join(notes))
-    q["check4"] = flags
+    q["teammate_out"] = flags
     q["own_status"] = [status.get(i, "") for i in q.index]
-
-    # confidence: medium to start; check 1 disagreement lowers it; checks 2-3 move buys and sells by the spec;
-    # a teammate on the report lowers it until his return is known
-    conf = []
-    for row in q.itertuples():
-        s = 0 if row.check1_agrees else -1
-        if row.action == "Buy low":
-            s += {"bad": 1, "good": -1}.get(row.line, 0) + {"wins both": 1, "loses both": -1}.get(row.check3, 0)
-        elif row.action == "Sell high":
-            s += {"bad": -1, "good": 1}.get(row.line, 0) + {"loses both": 1, "wins both": -1}.get(row.check3, 0)
-        if row.check4:
-            s -= 1
-        conf.append("high" if s >= 1 else "low" if s <= -1 else "medium")
-    q["confidence"] = conf
-    lines = {"role_cut": ROLE_CUT, "mtf_median": mtf_mid, "poe_median": poe_mid, "yac_median": yac_mid,
-             "league_exp_ypc": float(lg_mid)}
-    notes = {"role weeks": sorted(set(d["weeks"].values())), "creation weeks (PFR in full)": d["pfr_weeks"],
+    no_role = sorted(d["names"].get(i, i) for i in c_cur.index[(c_cur["touches"] >= 10) & ~c_cur.index.isin(b.index)])
+    lines = {"role_cut": ROLE_CUT, "creation_cut": cut, "raw_median": m, "k": k, "league_exp_ypc": float(lg_mid)}
+    notes = {"role weeks": sorted(set(d["weeks"].values())), "creation": f"{PRIOR} weeks 1-{dp['pfr_weeks'][-1]} + {SEASON} weeks "
+             f"{d['pfr_weeks'][0]}-{d['pfr_weeks'][-1]}",
+             f"{PRIOR} half vs half repeat": f"r = {r_half:.2f} on {n_half} backs (60+ touches each half), "
+                                             f"{half_t:.0f} touches a half on average -> K = {k:.0f} pseudo-touches",
              "games left out of role (a current-backfield teammate did not play)": meta["left_out"],
-             "backs left out (PFR carries miss the plays)": left,
-             f"backs with {MIN_TOUCHES}+ touches but no role game (every game had a current teammate missing)": no_role,
-             "qualifying backs": len(q)}
+             "seasons left out of creation (PFR carries miss the plays)": left_cur + left_pri,
+             "backs with 10+ touches this season but no role game": no_role, "qualifying backs": len(q)}
     return q, {"lines": lines, "notes": notes}
 
 
@@ -281,26 +304,29 @@ def main(argv=None) -> int:
     ap.add_argument("--out", type=Path, default=ROOT / "experiments" / "out" / "role_creation_2x2_2026")
     a = ap.parse_args(argv)
     q, meta = build()
-    keep = ["name", "team", "games", "snap", "carry_share", "i10", "t_i10", "i10_share", "role", "touches", "bt", "mtf", "ybc",
-            "yac", "pct_over_exp", "check_src", "check1_agrees", "team_exp_ypc", "block_vs_league", "line", "check3", "teammates",
-            "check4", "own_status", "action", "confidence"]
+    keep = ["name", "team", "games", "snap", "carry_share", "i10", "t_i10", "i10_share", "role", "pool_touches", "pool_bt",
+            "prior_touches", "cur_touches", "cur_bt", "raw", "creation", "to_flip", "close_call", "thin", "cur_ybc", "pct_over_exp",
+            "team_exp_ypc", "block_vs_league", "line", "teammates_result", "teammates", "teammate_out", "own_status", "action"]
     rows = q[keep].sort_values("role", ascending=False).reset_index(names="gsis_id")
     a.out.parent.mkdir(parents=True, exist_ok=True)
     a.out.with_suffix(".json").write_text(json.dumps({**meta, "rows": rows.round(4).to_dict("records")}, indent=1, default=str),
                                           encoding="utf-8")
     L, N = meta["lines"], meta["notes"]
-    out = [f"# Role vs creation, {SEASON} (role weeks {N['role weeks'][0]}-{N['role weeks'][-1]}; creation weeks "
-           f"{N['creation weeks (PFR in full)'][0]}-{N['creation weeks (PFR in full)'][-1]})", "",
-           f"{N['qualifying backs']} backs with {MIN_TOUCHES}+ touches. Role = average of snap share (for route participation) and "
-           f"inside-10 carry share, games with the current backfield only, last {RECENT_GAMES} games x{RECENT_WEIGHT:g}; cut at "
-           f"{ROLE_CUT:.0f}%. Creation = broken tackles per touch (PFR); cut at the median {100 * L['mtf_median']:.1f} per 100 touches. "
-           "Not backtested.", "",
-           "| Back | Team | Role | BT/100 | Action | Check 1 | Line | Teammates | Teammate out | Confidence |",
-           "|---|---|---|---|---|---|---|---|---|---|"]
+    out = [f"# Role vs creation, {SEASON}: role weeks {N['role weeks'][0]}-{N['role weeks'][-1]} (recent weighted); creation "
+           f"{N['creation']}", "",
+           f"{N['qualifying backs']} backs ({MIN_TOUCHES}+ touches over {PRIOR}-{SEASON}, 2+ role games). Role cut {ROLE_CUT:.0f}%. "
+           f"Creation = broken tackles per touch pulled toward the median {100 * L['raw_median']:.1f} per 100 by K = {L['k']:.0f} "
+           f"pseudo-touches ({N[f'{PRIOR} half vs half repeat']}); cut at the median {100 * L['creation_cut']:.2f}. Close call = "
+           f"within {CLOSE_EVENTS} broken tackles of the line ('To flip': + = that many more to reach the line, - = that many above "
+           f"it). * = under {THIN_PRIOR} touches in {PRIOR}. Not backtested.", "",
+           "| Back | Team | Role | Creation /100 | BT on touches | To flip | Action | % runs over exp. | Line | Teammates | Teammate out | Own status |",
+           "|---|---|---|---|---|---|---|---|---|---|---|---|"]
     for x in rows.to_dict("records"):
-        c1 = ("agrees" if x["check1_agrees"] else "DISAGREES") + f" ({x['check_src']})"
-        out.append(f"| {x['name']} | {x['team']} | {x['role']:.0f} | {100 * x['mtf']:.1f} | {x['action']} | {c1} | {x['line']} | "
-                   f"{x['check3'] or '-'} | {x['check4'] or '-'} | {x['confidence']} |")
+        flip = f"{x['to_flip']:+.1f}" + (" close" if x["close_call"] else "")
+        poe = "" if pd.isna(x["pct_over_exp"]) else f"{100 * x['pct_over_exp']:.0f}%"
+        out.append(f"| {x['name']}{'*' if x['thin'] else ''} | {x['team']} | {x['role']:.0f} | {100 * x['creation']:.2f} | "
+                   f"{int(x['pool_bt'])} on {int(x['pool_touches'])} | {flip} | {x['action']} | {poe} | {x['line']} | "
+                   f"{x['teammates_result'] or '-'} | {x['teammate_out'] or '-'} | {x['own_status'] or '-'} |")
     out += ["", "Notes: " + "; ".join(f"{k}: {v}" for k, v in N.items() if k != "qualifying backs")]
     a.out.with_suffix(".md").write_text("\n".join(out) + "\n", encoding="utf-8")
     print("\n".join(out))
