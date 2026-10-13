@@ -10,8 +10,8 @@ The chart
   lead-back cutoff needs; target share would not reach it). Inside-10 share is lumpy -- a team may have two
   such carries in a month -- so it is pulled toward his carry share by K_I10 team inside-10 carries (which
   brings his carry share in where his team has few such carries).
-  'Current backfield' = the team's backs with a median snap share of 25%+ who played in one of its last two
-  games. A game in which one of them did not play is left out when that teammate's median snap share is at
+  'Current backfield' = the team's backs with a median snap share of 25%+ over two or more games (a one-game
+  fill-in is not a backfield) who played in one of its last two games. A game in which one of them did not play is left out when that teammate's median snap share is at
   least half the back's own (his role there was inflated by the absence); a minor teammate's absence does not
   change a starter's role, so those games stay.
 - y, creation: missed tackles forced per touch -- Pro Football Reference's broken tackles on carries and
@@ -31,7 +31,8 @@ The checks, in order (each a column; together they set a confidence)
    who loses both is the strongest sell; read the other way round, a buy who loses both or a sell who wins
    both is weaker (the spec's rule applied in reverse, a stated choice).
 4. Why the role is what it is: a current-backfield teammate on the latest week's injury report (or who
-   missed the team's latest game) is named with his status; the report gives a weekly status, not a return date.
+   missed the team's latest game) is named with his status, unless he then played that week's game (a
+   pre-game Questionable he played through is not a reason); the report gives a weekly status, not a return date.
 
 Weeks: role uses every week of play-by-play; creation and the PFR checks use the weeks PFR has posted for
 every game. A back is a running back by his latest weekly roster listing (fullbacks out); PFR and snap ids
@@ -119,7 +120,8 @@ def role(d: dict) -> tuple[pd.DataFrame, dict]:
     team_games = d["p"].groupby("posteam")["week"].apply(lambda w: sorted(set(w)))
     # current backfield: core backs (median snap share 25%+) who played in one of the team's last two games
     med = pl.groupby(["team", "gsis_id"])["offense_pct"].median()
-    core = med[med >= CORE_BACK].reset_index()
+    n_games = pl.groupby(["team", "gsis_id"])["game_id"].nunique()
+    core = med[(med >= CORE_BACK) & (n_games >= 2)].reset_index()
     seen = set(zip(pl["gsis_id"], pl["week"]))
     current = {t: sorted(g for g in grp["gsis_id"] if any((g, w) in seen for w in team_games[t][-2:]))
                for t, grp in core.groupby("team")}
@@ -184,7 +186,9 @@ def latest_status(d: dict) -> dict:
         return {}
     wk = int(inj["week"].max())
     cur = inj[inj["week"] == wk]
-    return {gid: f"{r['report_status']} wk {wk} ({r['report_primary_injury']})" for gid, r in cur.set_index("gsis_id").iterrows()}
+    seen = set(zip(d["played"]["gsis_id"], d["played"]["week"]))
+    return {gid: f"{r['report_status']} wk {wk} ({r['report_primary_injury']})" for gid, r in cur.set_index("gsis_id").iterrows()
+            if (gid, wk) not in seen}                         # he played that week's game: the tag was pre-game
 
 
 def build() -> tuple[pd.DataFrame, dict]:
@@ -192,6 +196,7 @@ def build() -> tuple[pd.DataFrame, dict]:
     b, meta = role(d)
     c, left = creation(d)
     r = b.join(c[["touches", "bt", "mtf", "ybc", "yac", "pfr_carries"]], how="inner")
+    no_role = sorted(d["names"].get(i, i) for i in c.index[(c["touches"] >= MIN_TOUCHES) & ~c.index.isin(b.index)])
     q = r[r["touches"] >= MIN_TOUCHES].copy()
     mtf_mid = float(q["mtf"].median())
     q["action"] = [ACTIONS[(x >= ROLE_CUT, y >= mtf_mid)] for x, y in zip(q["role"], q["mtf"])]
@@ -265,7 +270,9 @@ def build() -> tuple[pd.DataFrame, dict]:
              "league_exp_ypc": float(lg_mid)}
     notes = {"role weeks": sorted(set(d["weeks"].values())), "creation weeks (PFR in full)": d["pfr_weeks"],
              "games left out of role (a current-backfield teammate did not play)": meta["left_out"],
-             "backs left out (PFR carries miss the plays)": left, "qualifying backs": len(q)}
+             "backs left out (PFR carries miss the plays)": left,
+             f"backs with {MIN_TOUCHES}+ touches but no role game (every game had a current teammate missing)": no_role,
+             "qualifying backs": len(q)}
     return q, {"lines": lines, "notes": notes}
 
 
