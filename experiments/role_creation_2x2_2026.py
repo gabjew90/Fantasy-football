@@ -18,7 +18,7 @@ The chart
   pulled toward the qualifying backs' median rate by K pseudo-touches: (broken tackles + K x median) /
   (touches + K). K is not chosen by hand: it is set from how much the rate repeats between 2025's two halves,
   K = (average half-season touches) x (1 - r) / r, so the less the rate repeats, the harder a back is pulled
-  to the middle. Cut at the median of the qualifying backs. A back with under THIN_PRIOR touches in 2025
+  to the middle (if r is 0.02 or less -- no repeat at all -- K is 50 half-seasons of touches). Cut at the median of the qualifying backs. A back with under THIN_PRIOR touches in 2025
   (mostly rookies) is flagged: his number rests on 2026 alone.
 - close call: how many broken tackles would move him across the creation line, on his own touches; within
   CLOSE_EVENTS is marked. This replaces any confidence score.
@@ -84,7 +84,7 @@ def full_pfr_weeks(p: pd.DataFrame, *pfr: pd.DataFrame) -> list[int]:
     return sorted(ok)
 
 
-def load(season: int) -> dict:
+def load(season: int, plays_only: bool = False) -> dict:
     AGE = {"max_age_s": F.CURRENT_SEASON_MAX_AGE_S} if season == SEASON else {}
     p = pd.read_csv(F.nflverse("pbp", season, **AGE), usecols=COLS, low_memory=False)
     p = p[p["season_type"] == "REG"]
@@ -109,8 +109,12 @@ def load(season: int) -> dict:
             & p["rusher_player_id"].notna()]
     car = car.assign(i10=car["yardline_100"] <= 10)
     tgt = p[flag(p["pass_attempt"]) & ~flag(p["sack"]) & ~flag(p["two_point_attempt"]) & p["receiver_player_id"].notna()]
-    played = data.played(data.snaps(season), ros)
     weeks = dict(zip(p["game_id"], p["week"]))
+    base = {"p": p, "car": car, "tgt": tgt, "rush": rush, "rec": rec, "rbs": rbs, "pfr_weeks": pfr_weeks,
+            "names": latest.set_index("gsis_id")["full_name"], "weeks": weeks}
+    if plays_only:                      # 2025 feeds creation only: no snaps or injury reports needed
+        return base
+    played = data.played(data.snaps(season), ros)
     played = played[played["game_id"].isin(weeks) & played["gsis_id"].isin(rbs)].copy()
     played["week"] = played["game_id"].map(weeks)
     inj = pd.read_csv(F.nflverse("injuries", season, **AGE))
@@ -141,12 +145,13 @@ def role(d: dict) -> tuple[pd.DataFrame, dict]:
                 f"wk {row.week} (no {', '.join(names.get(m, m) for m in missing)})")
     # left hurt: a regular back's game under half his median snaps, then a missed next game or Out/Doubtful next week
     own_med = pl.groupby("gsis_id")["offense_pct"].transform("median")
+    snap_weeks = pl.groupby("team")["week"].apply(lambda w: sorted(set(w)))
     inj = d["inj"]
     serious = set(zip(inj.loc[inj["report_status"].isin(["Out", "Doubtful"]), "gsis_id"],
                       inj.loc[inj["report_status"].isin(["Out", "Doubtful"]), "week"]))
     hurt = []
     for row, om in zip(pl.itertuples(), own_med):
-        nxt = [w for w in team_games.get(row.team, []) if w > row.week]
+        nxt = [w for w in snap_weeks.get(row.team, []) if w > row.week]     # the team's next game with snaps posted
         h = bool(om >= 0.40 and row.offense_pct < 0.5 * om and nxt
                  and ((row.gsis_id, nxt[0]) not in seen or (row.gsis_id, nxt[0]) in serious))
         hurt.append(h)
@@ -221,14 +226,14 @@ def half_r(d: dict) -> tuple[float, float, int]:
 
 
 def build() -> tuple[pd.DataFrame, dict]:
-    d, dp = load(SEASON), load(PRIOR)
+    d, dp = load(SEASON), load(PRIOR, plays_only=True)
     b, meta = role(d)
     c_cur, left_cur = creation(d)
     c_pri, left_pri = creation(dp)
     cols = ["touches", "bt"]
     pooled = c_cur[cols].add(c_pri[cols], fill_value=0)
     r_half, half_t, n_half = half_r(dp)
-    k = half_t * (1 - r_half) / r_half if r_half > 0.02 else 50 * half_t      # no repeat at all: pull nearly to the middle
+    k = half_t * (1 - r_half) / r_half if r_half > 0.02 else 50 * half_t      # r <= 0.02 (no repeat): 50 half-seasons' pull
     r = b[b["games"] >= 2].join(pooled.add_prefix("pool_"), how="inner")
     r = r.join(c_cur[["touches", "bt", "ybc"]].add_prefix("cur_"), how="left")
     r["prior_touches"] = c_pri["touches"].reindex(r.index).fillna(0)
@@ -268,6 +273,10 @@ def build() -> tuple[pd.DataFrame, dict]:
             txt.append("")
             continue
         my = mates["cur_ybc"].dropna()
+        if pd.isna(row["cur_ybc"]):
+            res.append("no comparison (no carries in PFR's weeks)")
+            txt.append("")
+            continue
         better = bool((row["cur_ybc"] > my).all() and (row["creation"] > mates["creation"]).all())
         worse = bool((row["cur_ybc"] < my).all() and (row["creation"] < mates["creation"]).all())
         res.append("wins both" if better else "loses both" if worse else "split")
