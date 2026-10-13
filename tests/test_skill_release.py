@@ -485,7 +485,8 @@ def test_every_module_nfl_py_imports_ships_in_the_release():
 HARNESS_RULES = {
     "dirs": ("core/", "fantasy/", "draftkit/", "manager/", "props/engine/", "props/calc/", "leagues/"),
     "files": ("CHAT.md", "nfl.py", "config.yaml", "requirements.txt", "tiers.csv", "tiers.keefamania.csv",
-              "data/processed/absence_bands.json", "props/journal.py", "props/persist.py"),
+              "data/processed/absence_bands.json", "props/journal.py", "props/persist.py",
+              "props/settle.py", "props/calls.py", "props/engine_version.py", "props/guard.py"),
     "globs": ("data/external/*.csv",),
     "exclude_parts": ("__pycache__", "backtest_out", "cache", "lines", "log"),
     "exclude_suffixes": (".pyc", ".pyo", ".env", ".pkl", ".tmp", ".part", ".gz", ".npz"),
@@ -727,3 +728,38 @@ def test_a_verified_local_copy_is_not_fetched_again(tmp_path, monkeypatch):
     B.harness_update({"harness": _pin(new)}, tmp_path, [])
     assert len(calls) == 2, "the second session reuses the verified copy"
 
+
+
+def test_every_local_module_a_released_file_imports_is_released():
+    """`screen --grade` crashed in chat: props/journal.py imports props/settle.py, which the release did
+    not ship (DECISIONS #246). Every import in a released .py file -- function-level ones included --
+    that resolves to a file in the repo (from the repo root, or from the importing file's own folder,
+    which the props modules put on sys.path) must be in the release too."""
+    import ast
+    root = Path(R.__file__).resolve().parents[1]
+    if R._tracked(root) is None:
+        pytest.skip("not a git checkout")
+    rel = set(R.files(root))
+    missing = {}
+    for f in sorted(x for x in rel if x.endswith(".py")):
+        here = (root / f).parent
+        for node in ast.walk(ast.parse((root / f).read_text(encoding="utf-8"))):
+            if isinstance(node, ast.Import):
+                mods, bases = [a.name for a in node.names], (root, here)
+            elif isinstance(node, ast.ImportFrom) and node.level:
+                base = here
+                for _ in range(node.level - 1):
+                    base = base.parent
+                pre = (node.module + ".") if node.module else ""
+                mods, bases = [node.module or ""] + [pre + a.name for a in node.names], (base,)
+            elif isinstance(node, ast.ImportFrom):
+                mods, bases = [node.module] + [node.module + "." + a.name for a in node.names], (root, here)
+            else:
+                continue
+            for m in filter(None, mods):
+                p = m.replace(".", "/")
+                for base in bases:
+                    for cand in (base / (p + ".py"), base / p / "__init__.py"):
+                        if cand.is_file() and cand.relative_to(root).as_posix() not in rel:
+                            missing.setdefault(cand.relative_to(root).as_posix(), set()).add(f)
+    assert not missing, f"imported by released files but not released: {missing}"

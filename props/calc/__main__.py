@@ -208,9 +208,11 @@ def qb_today(b, team: str, season: int, week: int) -> str:
     played = player.played_before(b.schedule, team, season, week)
     if played.empty:
         return ""                              # his team has not played yet: no starter yet
-    now = player._starter(played.iloc[-1], team)
-    if now is None:
-        return ""
+    started = played[[player._starter(g, team) is not None for _, g in played.iterrows()]]
+    if started.empty:
+        return ""                              # no played game with its plays posted yet
+    last = started.iloc[-1]                    # a final score posted before its plays has no starter yet
+    now = player._starter(last, team)
     if b.__dict__.get("_injuries_season") != season:
         b._injuries = data.injuries(season, manifest=b.manifest)
         b._injuries_season = season
@@ -222,7 +224,7 @@ def qb_today(b, team: str, season: int, week: int) -> str:
         practice = str(me.get("practice_status", pd.Series([""])).iloc[-1])
         if str(status) == "Out":
             name = str(me["full_name"].iloc[-1]) if "full_name" in me and pd.notna(me["full_name"].iloc[-1]) \
-                and str(me["full_name"].iloc[-1]).strip() else player._starter(played.iloc[-1], team, "name")
+                and str(me["full_name"].iloc[-1]).strip() else player._starter(last, team, "name")
             return f"{name or 'His starting QB'} ruled Out."
         if str(status) in NOT_CONFIRMED or (pd.isna(status) and practice.startswith("Did Not Participate")):
             return "Starting QB not confirmed."
@@ -488,7 +490,7 @@ def screen(a) -> str:
     lookup = lines.LineLookup(b.rosters)
     inj = _display(lambda: _injuries(b, season))
     inj_ok = not isinstance(inj, dict)
-    rows, problems, ruled_out = [], [], {}
+    rows, problems, ruled_out, n_posted = [], [], {}, 0
     lines_out, sides_out = {}, {}                  # whole lines never built; sides built but not listed
     skip = lambda why: lines_out.__setitem__(why, lines_out.get(why, 0) + 1)      # noqa: E731
     unlisted = lambda why: sides_out.__setitem__(why, sides_out.get(why, 0) + 1)  # noqa: E731
@@ -499,6 +501,7 @@ def screen(a) -> str:
                                              "away_team": g["away_team"]})
         problems += bad + ([f"{unread} saved rows for {g['away_team']} at {g['home_team']} could not be read"]
                            if unread else [])
+        n_posted += len(posted)
         for p_ in posted:
             try:
                 got = build_card(b, p_["player"], p_["market"], "over", team=p_["team"], season=season, week=wk,
@@ -538,6 +541,12 @@ def screen(a) -> str:
                 r["_lookup"] = (got["stub"]["player"], got["stub"]["team"], wk)
                 rows.append(r)
     weeks = sorted({int(w) for w in games["week"]})
+    if not n_posted and not problems:
+        # nothing saved for the week: say so and fail, never a list that reads as "no leg at the bar" and a
+        # grade that reads as "nothing to grade" (DECISIONS #246)
+        raise SystemExit(f"No Sleeper lines are saved for {label}, week {', '.join(map(str, weeks))}: nothing to "
+                         f"screen{' or grade' if a.grade else ''}. Lines are saved by `python nfl.py calc capture` "
+                         f"before kickoff; calc's captures are read from {lines.CALC_LINES}.")
     L = [f"**Smallest ask at the price · {label} · week {', '.join(map(str, weeks))}**", "", S.HEADER, "", S.ORDER, ""]
     for _, g in games.iterrows():
         L += game_header(b, g, season, fixed, now) + [""]

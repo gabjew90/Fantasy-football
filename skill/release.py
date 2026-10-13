@@ -38,7 +38,10 @@ INCLUDE_DIRS = ("core/", "fantasy/", "draftkit/", "manager/", "props/engine/", "
 INCLUDE_FILES = ("CHAT.md", "nfl.py", "config.yaml", "requirements.txt", "tiers.csv", "tiers.keefamania.csv",
                  "data/processed/absence_bands.json",
                  # the calculator imports these two when it loads (props/calc/shared.py, DECISIONS #234)
-                 "props/journal.py", "props/persist.py")
+                 "props/journal.py", "props/persist.py",
+                 # and the journal's grader these four when `screen --grade` runs (DECISIONS #246):
+                 # settle (the stats join), calls and engine_version (settle's imports), guard (the week)
+                 "props/settle.py", "props/calls.py", "props/engine_version.py", "props/guard.py")
 # CHANGING THE RULES ABOVE DOES NOT REACH AN INSTALLED HARNESS. The installed
 # skill unpacks a release with its own copy of this file, as of its build, and
 # skips everything that copy does not include -- then the lock check fails and

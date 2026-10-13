@@ -42,7 +42,9 @@ class Bundle:
         self.games = data.games_played(data.player_games(self.pbp), played)
         # his share of his team's offensive snaps per game, for the fewer-snaps marker (display only)
         self.snap_share = played.reindex(columns=["game_id", "gsis_id", "offense_pct"])   # no share column: no marks
-        self.schedule = data.schedule(manifest=manifest, game_type=stype)
+        # who started each game is the play-by-play's, not the schedule's pre-game guess (DECISIONS #246)
+        self.schedule = data.starters_on_schedule(data.schedule(manifest=manifest, game_type=stype),
+                                                  self.pbp, self.rosters)
         self._kickoffs: dict | None = None
         self._week_starts: dict = {}
         r = self.rosters.dropna(subset=["gsis_id", "position"]).sort_values(["season", "week"])
@@ -292,7 +294,8 @@ def current_starter(schedule: pd.DataFrame, team: str, season: int, week: int):
     """The quarterback who started his team's most recent played game before `week` (DECISIONS #241:
     the current starter, not the opening-day one), or None before the team's first game."""
     t = played_before(schedule, team, season, week)
-    return _starter(t.iloc[-1], team) if len(t) else None
+    known = [q for q in (_starter(g, team) for _, g in t.iterrows()) if q]
+    return known[-1] if known else None     # a final score posted before its plays has no starter yet
 
 
 def backup_qb(mine: pd.DataFrame, schedule: pd.DataFrame, team: str, season: int, week: int) -> pd.DataFrame:
