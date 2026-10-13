@@ -28,7 +28,8 @@ The checks, in order (each a column; together they set a confidence)
    strengthens a buy and softens a sell; a good line (0.10+ above) the opposite.
 3. Compare teammates: yards before contact per carry and broken tackles per touch against his team's other
    backs with 10+ touches. A backup (role under 50%) who beats them on both is the strongest buy; a starter
-   who loses both is the strongest sell.
+   who loses both is the strongest sell; read the other way round, a buy who loses both or a sell who wins
+   both is weaker (the spec's rule applied in reverse, a stated choice).
 4. Why the role is what it is: a current-backfield teammate on the latest week's injury report (or who
    missed the team's latest game) is named with his status; the report gives a weekly status, not a return date.
 
@@ -253,9 +254,9 @@ def build() -> tuple[pd.DataFrame, dict]:
     for row in q.itertuples():
         s = 0 if row.check1_agrees else -1
         if row.action == "Buy low":
-            s += {"bad": 1, "good": -1}.get(row.line, 0) + (1 if row.check3 == "wins both" else 0)
+            s += {"bad": 1, "good": -1}.get(row.line, 0) + {"wins both": 1, "loses both": -1}.get(row.check3, 0)
         elif row.action == "Sell high":
-            s += {"bad": -1, "good": 1}.get(row.line, 0) + (1 if row.check3 == "loses both" else 0)
+            s += {"bad": -1, "good": 1}.get(row.line, 0) + {"loses both": 1, "wins both": -1}.get(row.check3, 0)
         if row.check4:
             s -= 1
         conf.append("high" if s >= 1 else "low" if s <= -1 else "medium")
