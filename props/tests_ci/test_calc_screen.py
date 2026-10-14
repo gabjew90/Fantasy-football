@@ -478,3 +478,15 @@ def test_a_suffix_is_not_a_surname(monkeypatch):
     monkeypatch.setattr(player, "current_starter", lambda *a: None)
     assert player.lineup_marks(_bundle(ros, share), LAST, "00-0000001", "ATL", "RB", 2026, 5)[1] == \
         ["1 of his last 4 came with Brian Robinson Jr. out. Robinson is active."]
+
+
+def test_a_teammate_not_yet_on_the_team_is_not_out_then(monkeypatch):
+    from props.calc import player
+    ros = pd.DataFrame([{"season": 2026, "week": w, "team": "LA", "gsis_id": "00-0000002", "full_name": "New Guy",
+                         "status": "ACT"} for w in (3, 4, 5)])            # joined in week 3
+    share = pd.DataFrame({"game_id": ["g3", "g4"], "gsis_id": ["00-0000002"] * 2, "offense_pct": [0.8, 0.8]})
+    monkeypatch.setattr(player, "main_teammates", lambda *a: ["00-0000002"])
+    monkeypatch.setattr(player, "current_starter", lambda *a: None)
+    marks, lines_, _ = player.lineup_marks(_bundle(ros, share), LAST.assign(team="LA"), "00-0000001", "LA", "WR", 2026, 5)
+    assert marks == [False] * 4 and lines_ == [], "weeks 1-2 he was not on the team: not 'out'"
+

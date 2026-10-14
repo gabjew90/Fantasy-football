@@ -363,7 +363,10 @@ def lineup_marks(b: Bundle, last: pd.DataFrame, gsis: str, team: str, pos: str, 
     starter of the QB footnote; a game another QB started is case a, a game the starter played while
     he is Out or on IR today is case b. 'Active today' = not Out on the priced week's official report
     and not on injured reserve (RES on his latest roster listing); Questionable counts as active and
-    is returned as a flag. Returns (a mark per row of `last`, the card's cause lines, the flags).
+    is returned as a flag. Case a counts only a game he played for this team while the teammate was on
+    its roster that week (a teammate who joined later, or the player's games for another team, are not
+    "out"). Before the priced week's report is published nobody is Out today. Returns (a mark per row of
+    `last`, the card's cause lines, the flags).
     Display, the second average and the screen's gate only: no rate or bar reads it."""
     n = len(last)
     if not n:
@@ -388,7 +391,11 @@ def lineup_marks(b: Bundle, last: pd.DataFrame, gsis: str, team: str, pos: str, 
         gone = today(m)
         if status.get(m) == "Questionable" and not gone:
             flags.append(f"{names_.get(m, m)} Questionable")
-        out_games = [i for i, gid in enumerate(last["game_id"]) if (gid, m) not in played and not gone]
+        rostered = set(zip(*ros[(ros["gsis_id"] == m) & (ros["team"] == team)][["season", "week"]].T.values)) \
+            if len(ros) else set()
+        ours = list(last["team"] == team) if "team" in last else [True] * n
+        out_games = [i for i, (gid, yr, wk) in enumerate(zip(last["game_id"], last["season"], last["week"]))
+                     if (gid, m) not in played and not gone and ours[i] and (yr, wk) in rostered]
         in_games = [i for i, gid in enumerate(last["game_id"]) if (gid, m) in played and gone]
         for i in out_games + in_games:
             marks[i] = True

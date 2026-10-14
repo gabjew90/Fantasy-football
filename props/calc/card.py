@@ -707,6 +707,8 @@ def render_not_enough(pl: Player, m: str, side: str, line: float | None, mult_ov
     out.append("Last games: " + (", ".join(f"{w}{'*' if mk else ''}" for w, mk, _ in rows) or "none")
                + f" ({many})")
     out += _notes(rows, pl.season)
+    for x in pl.lineup:
+        out += _wrap(x)
     if footer:
         out += [""] + _wrap(footer)
     return "\n".join(out)
@@ -721,7 +723,7 @@ def render_not_enough_md(pl: Player, m: str, side: str, line: float | None, mult
     out += ["", "Check first: not enough data, so no bar:"] + [f"- {why}" for why in pl.not_enough[m]]
     rows = last_games(pl, m, 4)
     out += ["", f"Last games ({many}): {_md_last(rows) or 'none'}"]
-    notes = _md_notes(rows, pl.season)
+    notes = _md_notes(rows, pl.season) + list(pl.lineup)
     if notes:
         out += [""] + [f"* {x}" for x in notes]
     if footer:
