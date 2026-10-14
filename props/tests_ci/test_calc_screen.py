@@ -312,7 +312,7 @@ def test_the_game_header_names_a_grade_earned_with_a_quarterback_who_is_out(monk
     assert "| BAL run offense vs ATL run defense | A- vs S+ (graded with Lamar Jackson, who is Out) |" in L
     assert "| BAL pass offense vs ATL pass defense | S+ vs A- (graded with Lamar Jackson, who is Out) |" in L
     assert "| ATL run offense vs BAL run defense | S- vs C |" in L and "BAL quarterback: Lamar Jackson ruled Out." in L
-    assert "BAL: the week's injury report is not out yet." in L
+    assert "BAL: Injury report not yet published: nobody counts as Out today." in L
 
 
 def test_a_player_ruled_out_is_named_and_never_ranked(one_window, monkeypatch):
@@ -398,8 +398,11 @@ def test_both_averages_print_and_the_gate_names_a_leg_the_changed_games_carry():
     assert "Lead Back out" in r2["lineup_out"]
 
 
-def _bundle(ros, share, report=None):
-    rep = pd.DataFrame(report or [], columns=["season", "week", "gsis_id", "report_status"])
+def _bundle(ros, share, report=None, published=("LA", "NYJ", "BAL", "ATL")):
+    """A stub bundle; `published`: teams whose week-5 report is out (a filler row each, DECISIONS #248)."""
+    rows = [dict(r, team=r.get("team", "LA")) for r in (report or [])]
+    rows += [{"season": 2026, "week": 5, "team": t, "gsis_id": "filler", "report_status": None} for t in published]
+    rep = pd.DataFrame(rows, columns=["season", "week", "team", "gsis_id", "report_status"])
     return type("B", (), {"rosters": ros, "snap_share": share, "schedule": None,
                           "injury_report": lambda self, s: rep})()
 
@@ -489,4 +492,39 @@ def test_a_teammate_not_yet_on_the_team_is_not_out_then(monkeypatch):
     monkeypatch.setattr(player, "current_starter", lambda *a: None)
     marks, lines_, _ = player.lineup_marks(_bundle(ros, share), LAST.assign(team="LA"), "00-0000001", "LA", "WR", 2026, 5)
     assert marks == [False] * 4 and lines_ == [], "weeks 1-2 he was not on the team: not 'out'"
+
+
+def test_a_card_says_when_the_weeks_injury_report_is_not_published(monkeypatch):
+    """DECISIONS #248: before his team's report for the priced week is out, nobody counts as Out today,
+    and the card's lineup line says so; once it is out, the line goes."""
+    from props.calc import player
+    ros = pd.DataFrame([{"season": 2026, "week": 5, "team": "LA", "gsis_id": "00-0000002", "full_name": "Puka Nacua",
+                         "status": "ACT"}])
+    share = pd.DataFrame({"game_id": ["g1"], "gsis_id": ["00-0000002"], "offense_pct": [0.9]})
+    monkeypatch.setattr(player, "main_teammates", lambda *a: [])
+    monkeypatch.setattr(player, "current_starter", lambda *a: None)
+    none_yet = _bundle(ros, share, published=())
+    assert player.lineup_marks(none_yet, LAST, "00-0000001", "LA", "WR", 2026, 5)[1] == \
+        ["Injury report not yet published: nobody counts as Out today."]
+    other_team_only = type("B", (), {"rosters": ros, "snap_share": share, "schedule": None, "injury_report":
+                                     lambda self, s: pd.DataFrame([{"season": 2026, "week": 5, "team": "DAL",
+                                                                    "gsis_id": "x", "report_status": "Out"}])})()
+    assert player.lineup_marks(other_team_only, LAST, "00-0000001", "LA", "WR", 2026, 5)[1] == \
+        ["Injury report not yet published: nobody counts as Out today."], "his team's report, not another team's"
+    out = type("B", (), {"rosters": ros, "snap_share": share, "schedule": None, "injury_report":
+                         lambda self, s: pd.DataFrame([{"season": 2026, "week": 5, "team": "LA",
+                                                        "gsis_id": "y", "report_status": "Questionable"}])})()
+    assert player.lineup_marks(out, LAST, "00-0000001", "LA", "WR", 2026, 5)[1] == []
+
+
+def test_an_unreadable_report_says_not_read(monkeypatch):
+    from props.calc import player
+    ros = pd.DataFrame([{"season": 2026, "week": 5, "team": "LA", "gsis_id": "00-0000002", "full_name": "X",
+                         "status": "ACT"}])
+    share = pd.DataFrame({"game_id": [], "gsis_id": [], "offense_pct": []})
+    monkeypatch.setattr(player, "main_teammates", lambda *a: [])
+    monkeypatch.setattr(player, "current_starter", lambda *a: None)
+    b = type("B", (), {"rosters": ros, "snap_share": share, "schedule": None, "injury_report": lambda self, s: None})()
+    assert player.lineup_marks(b, LAST, "00-0000001", "LA", "WR", 2026, 5)[1] == \
+        ["Injury report not read: nobody counts as Out today."]
 

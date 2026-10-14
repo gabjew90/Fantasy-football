@@ -623,7 +623,7 @@ def game_header(b, g, season: int, fixed: dict, now) -> list[str]:
     for t in (away, home):
         tr = inj[(inj["week"] == wk) & (inj["team"] == t)]
         if tr.empty:
-            L.append(f"{t}: the week's injury report is not out yet.")
+            L.append(f"{t}: Injury report not yet published: nobody counts as Out today.")   # DECISIONS #248
             continue
         out = sorted(tr[tr["report_status"] == "Out"]["full_name"].dropna().unique())
         q = tr[tr["report_status"].isin(["Doubtful", "Questionable"])].dropna(subset=["full_name"])
