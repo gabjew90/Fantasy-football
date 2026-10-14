@@ -216,6 +216,7 @@ class Player:
     receiving: dict = field(default_factory=dict)     # rec_yds: catch rate, yards per catch, depth mix, pools
     passing: dict = field(default_factory=dict)       # pass_yds: depth mix and the starters' completion pools
     lineup: list = field(default_factory=list)        # the lineup check's cause lines for his marked last-4 games
+    lineup_flags: list = field(default_factory=list)  # main teammates Questionable today (a flag on the screen row)
 
     def usual(self, market: str, games: int) -> float | None:
         """His average workload over his last `games` games played; None with
@@ -326,29 +327,11 @@ def backup_qb(mine: pd.DataFrame, schedule: pd.DataFrame, team: str, season: int
     return mine.assign(backup_qb=marks, qb_started=names_)
 
 
-def snap_marks(window: pd.DataFrame, k: float) -> pd.DataFrame:
-    """The lineup check's snap marks (the user, 2026-10-13, DECISIONS #247): a game where his offensive
-    snap share was under k times OR over 1/k times his average share in his OTHER games of the window
-    (the games his longer-run rate uses) -- fewer_snaps / more_snaps. k is fewer_snaps_share, the same
-    threshold both ways. A game with no share, or no other game with one, is not marked. Display and the
-    screen's gate only: no rate or bar reads it."""
-    if window.empty or "snap_pct" not in window:
-        return window.assign(fewer_snaps=False, more_snaps=False)
-    pct = pd.to_numeric(window["snap_pct"], errors="coerce").to_numpy()
-    low, high = [], []
-    for i, p in enumerate(pct):
-        others = pd.Series([x for j, x in enumerate(pct) if j != i]).dropna()
-        ok = pd.notna(p) and len(others) > 0
-        avg = float(others.mean()) if len(others) else float("nan")
-        low.append(bool(ok and p < k * avg))
-        high.append(bool(ok and p > avg / k))
-    return window.assign(fewer_snaps=low, more_snaps=high)
-
-
 def main_teammates(b: Bundle, gsis: str, team: str, pos: str, season: int, week: int) -> list[str]:
     """His position group's main players (the user, 2026-10-13): WR/TE -- the team's top 3 receivers
     (WR or TE) by targets this season before the priced week; RB -- its lead carrier by carries. He is
-    never his own teammate. Ties go to the smaller gsis id, so the list is stable."""
+    never his own teammate. Ties go to the smaller gsis id, so the list is stable. (The starting QB is
+    the other main teammate; lineup_marks reads him from the QB footnote's starters.)"""
     if pos in ("WR", "TE"):
         plays, group, n = b.cut(b.targets[b.targets["season"] == season], season, week, "targets"), ("WR", "TE"), 3
     elif pos == "RB":
@@ -361,44 +344,72 @@ def main_teammates(b: Bundle, gsis: str, team: str, pos: str, season: int, week:
     return list(counts.sort_values(["n", "gsis_id"], ascending=[False, True])["gsis_id"].head(n))
 
 
-def lineup_causes(b: Bundle, last: pd.DataFrame, gsis: str, team: str, pos: str, season: int, week: int) -> list[str]:
-    """One line per main teammate behind his marked last-4 games (snap-marked; a different starting QB is
-    explained by the QB footnote the card already prints): a main teammate on his team's roster that week
-    who took no offensive snap -- "2 of his last 4 came with Puka Nacua out. Nacua is active." -- or one
-    who played in it and is Out or on injured reserve now. 'Now' is the priced week's official report
-    (Out) and his latest roster listing (RES = injured reserve). Display only."""
-    marked = last[last["fewer_snaps"] | last["more_snaps"]]
-    if marked.empty:
-        return []
-    mates = main_teammates(b, gsis, team, pos, season, week)
-    if not mates:
-        return []
-    played = set(zip(b.snap_share["game_id"], b.snap_share["gsis_id"]))
-    ros = b.rosters
+def _surname(name: str) -> str:
+    words = [w for w in str(name).split() if w.rstrip(".").upper() not in ("JR", "SR", "II", "III", "IV", "V")]
+    return words[-1] if words else str(name)
+
+
+def lineup_marks(b: Bundle, last: pd.DataFrame, gsis: str, team: str, pos: str, season: int,
+                 week: int) -> tuple[list[bool], list[str], list[str]]:
+    """The lineup check (the user, 2026-10-13; DECISIONS #247): a last-4 game is marked when a main
+    teammate's status in it differs from today's --
+      a. he took no offensive snap in that game and is active today, or
+      b. he played in it and is Out or on injured reserve today.
+    Main teammates: his position group's (main_teammates) and the team's starting QB -- the current
+    starter of the QB footnote; a game another QB started is case a, a game the starter played while
+    he is Out or on IR today is case b. 'Active today' = not Out on the priced week's official report
+    and not on injured reserve (RES on his latest roster listing); Questionable counts as active and
+    is returned as a flag. Returns (a mark per row of `last`, the card's cause lines, the flags).
+    Display, the second average and the screen's gate only: no rate or bar reads it."""
+    n = len(last)
+    if not n:
+        return [], [], []
     rep = b.injury_report(season)
-    now_out = set() if rep is None else set(rep[(rep["season"] == season) & (rep["week"] == week)
-                                                & (rep["report_status"] == "Out")]["gsis_id"])
+    wk_rep = rep[(rep["season"] == season) & (rep["week"] == week)] if rep is not None else None
+    status = {} if wk_rep is None else dict(zip(wk_rep["gsis_id"], wk_rep["report_status"]))
+    ros = b.rosters
     latest = ros[(ros["season"] == season) & (ros["week"] <= week)].sort_values("week").drop_duplicates("gsis_id", keep="last")
     on_ir = set(latest[latest["status"].astype(str).str.startswith("RES")]["gsis_id"]) if "status" in latest else set()
     names_ = dict(zip(ros["gsis_id"], ros["full_name"]))
-    n, out = len(last), []
-    for m in mates:
+    played = set(zip(b.snap_share["game_id"], b.snap_share["gsis_id"]))
+
+    def today(m):
+        if m in on_ir:
+            return "on IR"
+        return "Out" if status.get(m) == "Out" else None
+
+    marks = [False] * n
+    lines, flags = [], []
+    for m in main_teammates(b, gsis, team, pos, season, week):
+        gone = today(m)
+        if status.get(m) == "Questionable" and not gone:
+            flags.append(f"{names_.get(m, m)} Questionable")
+        out_games = [i for i, gid in enumerate(last["game_id"]) if (gid, m) not in played and not gone]
+        in_games = [i for i, gid in enumerate(last["game_id"]) if (gid, m) in played and gone]
+        for i in out_games + in_games:
+            marks[i] = True
         name = names_.get(m, m)
-        words = [w for w in str(name).split() if w.rstrip(".").upper() not in ("JR", "SR", "II", "III", "IV", "V")]
-        surname = words[-1] if words else str(name)
-        rostered = [(int(g["season"]), int(g["week"])) for _, g in marked.iterrows()
-                    if len(ros[(ros["gsis_id"] == m) & (ros["team"] == team) & (ros["season"] == g["season"])
-                               & (ros["week"] == g["week"])])]
-        absent = sum(1 for (_, g) in marked.iterrows()
-                     if (int(g["season"]), int(g["week"])) in rostered and (g["game_id"], m) not in played)
-        present = sum(1 for _, g in marked.iterrows() if (g["game_id"], m) in played)
-        gone = "on injured reserve" if m in on_ir else ("Out today" if m in now_out else None)
-        if absent:
-            out.append(f"{absent} of his last {n} came with {name} out. {surname} is "
-                       + (f"{gone} again." if gone else "active."))
-        if present and gone:
-            out.append(f"{present} of his last {n} came with {name} playing. {surname} is {gone}.")
-    return out
+        if out_games:
+            lines.append(f"{len(out_games)} of his last {n} came with {name} out. {_surname(name)} is active.")
+        if in_games:
+            lines.append(f"{len(in_games)} of his last {n} came with {name} playing. {_surname(name)} is {gone}.")
+    # the starting QB, as the QB footnote reads him (DECISIONS #241 / #246): the current starter
+    qb = current_starter(b.schedule, team, season, week)
+    if qb and qb != gsis:
+        gone = today(qb)
+        if status.get(qb) == "Questionable" and not gone:
+            flags.append(f"{names_.get(qb, qb)} (QB) Questionable")
+        backup = list(last["backup_qb"]) if "backup_qb" in last else [False] * n
+        for i, gid in enumerate(last["game_id"]):
+            if backup[i] and not gone:
+                marks[i] = True                 # another QB started; the QB footnote names him
+        with_him = [i for i, gid in enumerate(last["game_id"]) if gone and not backup[i] and (gid, qb) in played]
+        for i in with_him:
+            marks[i] = True
+        if with_him:
+            name = names_.get(qb, qb)
+            lines.append(f"{len(with_him)} of his last {n} came with {name} at QB. {_surname(name)} is {gone}.")
+    return marks, lines, flags
 
 
 def _results(b: Bundle, games: pd.DataFrame, margin: int) -> pd.DataFrame:
@@ -444,11 +455,13 @@ def build(b: Bundle, gsis: str, name: str, team: str, season: int, week: int,
     mine = b.cut(b.games[b.games["gsis_id"] == gsis], season, week, "his games").sort_values(["season", "week"])
     mine = fewer_snaps(mine, b.snap_share, float(fixed["fewer_snaps_share"]))
     mine = backup_qb(mine, b.schedule, team, season, week)
-    window = snap_marks(mine.tail(int(fixed["rate_window_games"])), float(fixed["fewer_snaps_share"]))
+    window = mine.tail(int(fixed["rate_window_games"]))
+    last_n = int(fixed["usual_games"])
+    marks, causes, qflags = lineup_marks(b, window.tail(last_n), gsis, team, pos, season, week)
+    window = window.assign(lineup_mark=[False] * (len(window) - len(marks)) + marks)
     this = _results(b, mine[mine["season"] == season], int(fixed["result_margin"]))
     pools = b.pools(season, int(fixed["pool_seasons"]))
-    pl = Player(gsis, name, team, pos, season, week, window, this, pools=pools,
-                lineup=lineup_causes(b, window.tail(int(fixed["usual_games"])), gsis, team, pos, season, week))
+    pl = Player(gsis, name, team, pos, season, week, window, this, pools=pools, lineup=causes, lineup_flags=qflags)
     keys = pd.MultiIndex.from_frame(window[["season", "week"]]) if len(window) else None
 
     def own(df):

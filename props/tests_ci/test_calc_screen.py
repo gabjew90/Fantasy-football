@@ -354,87 +354,127 @@ def test_captures_left_inside_an_earlier_release_folder_are_read(tmp_path, monke
 
 # ---------------------------------------------------------------- the lineup check (DECISIONS #247)
 
-def test_snap_marks_flag_far_fewer_and_far_more_snaps_than_his_other_games():
-    from props.calc import player
-    w = pd.DataFrame({"snap_pct": [0.40, 0.42, 0.18, 0.95, 0.41, None]})
-    out = player.snap_marks(w, 0.5)
-    assert list(out["fewer_snaps"]) == [False, False, True, False, False, False], "0.18 is under half his other games"
-    assert list(out["more_snaps"]) == [False, False, False, True, False, False], "0.95 is over double"
-
-
-def test_both_averages_print_and_the_gate_names_a_leg_the_marked_games_carry():
-    pl, c = _card(40.5)                        # bar ~11 carries, his last 4 average 15.5 (two 19s, two 12s)
+def _marked(pl, lineup=None):
+    """His window with the two 19-carry games of the last 4 lineup-marked (12 and 12 remain)."""
     win = pl.window.copy()
-    win["more_snaps"] = False
-    win["fewer_snaps"] = False
+    win["lineup_mark"] = False
     last = win.tail(4)
-    win.loc[last.index[last["carries"] == 19], "more_snaps"] = True     # mark the two 19-carry games: 12 and 12 remain
+    win.loc[last.index[last["carries"] == 19], "lineup_mark"] = True
     pl.window = win
-    pl.lineup = ["2 of his last 4 came with Lead Back out. Back is active."]
+    pl.lineup = lineup if lineup is not None else ["2 of his last 4 came with Lead Back out. Back is active."]
+    return pl
+
+
+def test_a_low_snap_star_alone_does_not_remove_a_game():
+    pl, c = _card(40.5)
+    win = pl.window.copy()
+    win["fewer_snaps"] = False
+    win.loc[win.index[-1], "fewer_snaps"] = True
+    win["lineup_mark"] = False
+    pl.window = win
+    P = card._parts(pl, c, "over")
+    assert P["marked"] == 0 and P["usual_clean"] == pytest.approx(c["usual"]), "the star is a footnote only"
+    assert "without" not in card.render(pl, c, "over", opp="ARI").split("Last 4:")[1].split("\n")[0]
+
+
+def test_both_averages_print_and_the_gate_names_a_leg_the_changed_games_carry():
+    pl, c = _card(40.5)                        # bar ~11 carries, his last 4 average 15.5 (two 19s, two 12s)
+    pl = _marked(pl)
     P = card._parts(pl, c, "over")
     assert P["marked"] == 2 and P["usual_clean"] == pytest.approx(12.0) and P["n_clean"] == 2
     text = card.render(pl, c, "over", opp="ARI")
-    assert "(avg 15.5; 12.0 without the 2 marked games)" in text
-    assert "Short history: 2 games without the marked ones." in text
+    assert "(avg 15.5; 12.0 without the 2 games with a lineup change)" in text
+    assert "Short history: 2 games without a lineup change." in text
     assert "2 of his last 4 came with Lead Back out." in text
     r = S.side_row(pl, c, "over", SHOWN, STUB, card.value(c, "needed_under"))
     assert r["passes"], "12 still meets an ~11 bar: listed"
     assert r["gap"] == pytest.approx(12.0 - card.shown_work(card.value(c, "needed_over")))
-    assert "lineup check: 2 of 4 marked" in r["flags"] and "short history" in r["flags"]
+    assert "lineup change: 2 of 4" in r["flags"] and "short history" in r["flags"]
     pl2, c2 = _card(50.5)                      # bar ~14: the 15.5 average meets it, the 12.0 does not
-    pl2.window, pl2.lineup = win, pl.lineup
+    pl2 = _marked(pl2, pl.lineup)
     r2 = S.side_row(pl2, c2, "over", SHOWN, STUB, card.value(c2, "needed_under"))
     assert r2["lineup_out"] and not r2["passes"]
-    assert "his last-4 average is 15.5 but 12.0 without the 2 marked games" in r2["lineup_out"]
+    assert "his last-4 average is 15.5 but 12.0 without the 2 games with a lineup change" in r2["lineup_out"]
     assert "Lead Back out" in r2["lineup_out"]
 
 
-def test_a_main_teammate_out_in_a_marked_game_is_named(monkeypatch):
+def _bundle(ros, share, report=None):
+    rep = pd.DataFrame(report or [], columns=["season", "week", "gsis_id", "report_status"])
+    return type("B", (), {"rosters": ros, "snap_share": share, "schedule": None,
+                          "injury_report": lambda self, s: rep})()
+
+
+LAST = pd.DataFrame({"season": [2026] * 4, "week": [1, 2, 3, 4], "game_id": ["g1", "g2", "g3", "g4"],
+                     "backup_qb": [False] * 4})
+
+
+def test_a_main_teammate_out_then_and_active_now_marks_those_games(monkeypatch):
     from props.calc import player
-    last = pd.DataFrame({"season": [2026] * 4, "week": [1, 2, 3, 4], "game_id": ["g1", "g2", "g3", "g4"],
-                         "fewer_snaps": [False] * 4, "more_snaps": [False, True, True, False]})
     ros = pd.DataFrame([{"season": 2026, "week": w, "team": "LA", "gsis_id": "00-0000002", "full_name": "Puka Nacua",
-                         "status": "ACT", "position": "WR"} for w in (1, 2, 3, 4, 5)])
+                         "status": "ACT"} for w in (1, 2, 3, 4, 5)])
     share = pd.DataFrame({"game_id": ["g1", "g4"], "gsis_id": ["00-0000002"] * 2, "offense_pct": [0.9, 0.9]})
-    b = type("B", (), {"rosters": ros, "snap_share": share, "injury_report": lambda self, s: None})()
     monkeypatch.setattr(player, "main_teammates", lambda *a: ["00-0000002"])
-    assert player.lineup_causes(b, last, "00-0000001", "LA", "WR", 2026, 5) == \
-        ["2 of his last 4 came with Puka Nacua out. Nacua is active."]
-    ir = ros.assign(status=["ACT", "ACT", "ACT", "ACT", "RES"])
-    b2 = type("B", (), {"rosters": ir, "snap_share": share.assign(game_id=["g2", "g3"]),
-                        "injury_report": lambda self, s: None})()
-    assert player.lineup_causes(b2, last, "00-0000001", "LA", "WR", 2026, 5) == \
-        ["2 of his last 4 came with Puka Nacua playing. Nacua is on injured reserve."]
+    monkeypatch.setattr(player, "current_starter", lambda *a: None)
+    marks, lines_, flags = player.lineup_marks(_bundle(ros, share), LAST, "00-0000001", "LA", "WR", 2026, 5)
+    assert marks == [False, True, True, False]
+    assert lines_ == ["2 of his last 4 came with Puka Nacua out. Nacua is active."] and flags == []
+    q = _bundle(ros, share, [{"season": 2026, "week": 5, "gsis_id": "00-0000002", "report_status": "Questionable"}])
+    marks, _, flags = player.lineup_marks(q, LAST, "00-0000001", "LA", "WR", 2026, 5)
+    assert marks == [False, True, True, False], "Questionable counts as active"
+    assert flags == ["Puka Nacua Questionable"]
+
+
+def test_a_main_teammate_playing_then_and_out_now_marks_those_games(monkeypatch):
+    from props.calc import player
+    ros = pd.DataFrame([{"season": 2026, "week": w, "team": "NYJ", "gsis_id": "00-0000003",
+                         "full_name": "Breece Hall", "status": "ACT"} for w in (1, 2, 3, 4, 5)])
+    share = pd.DataFrame({"game_id": ["g1", "g2", "g3"], "gsis_id": ["00-0000003"] * 3, "offense_pct": [0.7] * 3})
+    monkeypatch.setattr(player, "main_teammates", lambda *a: ["00-0000003"])
+    monkeypatch.setattr(player, "current_starter", lambda *a: None)
+    out = _bundle(ros, share, [{"season": 2026, "week": 5, "gsis_id": "00-0000003", "report_status": "Out"}])
+    marks, lines_, _ = player.lineup_marks(out, LAST, "00-0000001", "NYJ", "RB", 2026, 5)
+    assert marks == [True, True, True, False], "week 4 he was out then too: like today, not marked"
+    assert lines_ == ["3 of his last 4 came with Breece Hall playing. Hall is Out."]
+    ir = _bundle(ros.assign(status=["ACT"] * 4 + ["RES"]), share)
+    assert player.lineup_marks(ir, LAST, "00-0000001", "NYJ", "RB", 2026, 5)[1] == \
+        ["3 of his last 4 came with Breece Hall playing. Hall is on IR."]
+
+
+def test_the_starting_qb_is_a_main_teammate(monkeypatch):
+    from props.calc import player
+    ros = pd.DataFrame([{"season": 2026, "week": 5, "team": "BAL", "gsis_id": "00-0000009",
+                         "full_name": "Lamar Jackson", "status": "ACT"}])
+    share = pd.DataFrame({"game_id": ["g1", "g2", "g3", "g4"], "gsis_id": ["00-0000009"] * 4, "offense_pct": [1.0] * 4})
+    monkeypatch.setattr(player, "main_teammates", lambda *a: [])
+    monkeypatch.setattr(player, "current_starter", lambda *a: "00-0000009")
+    backup = LAST.assign(backup_qb=[True, False, False, False])
+    marks, lines_, _ = player.lineup_marks(_bundle(ros, share), backup, "00-0000001", "BAL", "RB", 2026, 5)
+    assert marks == [True, False, False, False], "another QB started week 1 (the QB footnote names him)"
+    out = _bundle(ros, share, [{"season": 2026, "week": 5, "gsis_id": "00-0000009", "report_status": "Out"}])
+    marks, lines_, _ = player.lineup_marks(out, LAST, "00-0000001", "BAL", "RB", 2026, 5)
+    assert marks == [True] * 4 and lines_ == ["4 of his last 4 came with Lamar Jackson at QB. Jackson is Out."]
 
 
 def test_the_screen_names_a_leg_the_lineup_check_drops_and_never_ranks_it(one_window, monkeypatch):
     def lineup_card(b, name, market, side, **kw):
         pl, c = _card(50.5)                    # bar ~14; his last 4 average 15.5, 12.0 without the two 19s
-        win = pl.window.copy()
-        win["fewer_snaps"] = False
-        win["more_snaps"] = False
-        last = win.tail(4)
-        win.loc[last.index[last["carries"] == 19], "more_snaps"] = True
-        pl.window, pl.lineup = win, ["2 of his last 4 came with Lead Back out. Back is active."]
+        pl = _marked(pl)
         return {"stub": STUB, "ready": True, "not_enough": False, "c": c, "pl": pl, "shown": SHOWN,
                 "text": "T", "md": "M", "md_game": "G"}
     monkeypatch.setattr(CLI, "build_card", lineup_card)
     out = CLI.screen(_screen_args())
     assert "Not listed, lineup changed:" in out
-    assert "- Test Back rushing yards over: his last-4 average is 15.5 but 12.0 without the 2 marked games" in out
+    assert "- Test Back rushing yards over: his last-4 average is 15.5 but 12.0 without the 2 games with a lineup change" in out
     assert "| 1 | Test Back (DAL) · rushing yards Over" not in out, "a dropped leg is never ranked"
     assert "Lead Back out" in out
 
 
 def test_a_suffix_is_not_a_surname(monkeypatch):
     from props.calc import player
-    last = pd.DataFrame({"season": [2026] * 4, "week": [1, 2, 3, 4], "game_id": ["g1", "g2", "g3", "g4"],
-                         "fewer_snaps": [False, True, False, False], "more_snaps": [False] * 4})
     ros = pd.DataFrame([{"season": 2026, "week": w, "team": "ATL", "gsis_id": "00-0000002",
-                         "full_name": "Brian Robinson Jr.", "status": "ACT", "position": "RB"} for w in (1, 2, 3, 4, 5)])
-    b = type("B", (), {"rosters": ros, "snap_share": pd.DataFrame({"game_id": [], "gsis_id": [], "offense_pct": []}),
-                       "injury_report": lambda self, s: None})()
+                         "full_name": "Brian Robinson Jr.", "status": "ACT"} for w in (1, 2, 3, 4, 5)])
+    share = pd.DataFrame({"game_id": ["g1", "g3", "g4"], "gsis_id": ["00-0000002"] * 3, "offense_pct": [0.5] * 3})
     monkeypatch.setattr(player, "main_teammates", lambda *a: ["00-0000002"])
-    assert player.lineup_causes(b, last, "00-0000001", "ATL", "RB", 2026, 5) == \
+    monkeypatch.setattr(player, "current_starter", lambda *a: None)
+    assert player.lineup_marks(_bundle(ros, share), LAST, "00-0000001", "ATL", "RB", 2026, 5)[1] == \
         ["1 of his last 4 came with Brian Robinson Jr. out. Robinson is active."]
-

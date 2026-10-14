@@ -9202,21 +9202,25 @@ Mumpfield leg; the freeze otherwise stands to 2026-11-02.
   rates and settings.yaml's values are unchanged. The test line still describes what was tested -- the
   percent order (#244: top 3 a side -8.7 points against break-even) -- and says so; the live order is now
   C, which #244 measured once on the same legs (top 3 a side: Overs -10.6, Unders -4.8; no better).
-- **A lineup check on the last-4 average (B).** (1) A last-4 game is marked when his offensive snap share
-  was under half OR over double his share in his other games of the window -- the games behind his
-  longer-run rate, as the swing -- the same 0.5 threshold both ways (fewer_snaps_share; it used to mark only
-  the low side, against his other games that season). A game with a different starting QB is marked as
-  before. (2) For each snap-marked game the card looks for a cause among his position group's main
-  players (WR/TE: the team's top 3 receivers by targets this season; RB: the lead carrier): one on the
-  roster that week with no offensive snap ("2 of his last 4 came with Puka Nacua out. Nacua is active."),
-  or one who played in it and is Out today or on injured reserve; the QB footnote covers a QB change.
-  (3) The card prints both averages, the last 4 and the last 4 without the marked games; "Short history"
-  fires when fewer than 3 games remain. (4) The screen lists a leg only when both averages meet the bar;
-  otherwise it is named under "Not listed, lineup changed" with the reason; the cushion uses the average
-  without the marked games. (5) The week-8 rerun's pre-registration gains the hit rate of the legs this
-  check would have removed against those it kept, weeks 2-5 and 6-8 separately (the design note's Later
-  ideas).
-- **What the snap rule does not catch:** a player whose share rose without crossing double his average.
-  Mumpfield's weeks 2-3 with Nacua out (69% and 73%) are under double his window average (about 40%), so
-  no game of his is marked; the replay shows where he lands (the PR's report).
+- **A lineup check on the last-4 average (B), the user's second version (same day, before the merge).**
+  The first version marked a game by his own snap share (under half or over double his other games in
+  the window) as a proxy for a missing teammate; it missed the case it was built for (Mumpfield's 69% and
+  73% weeks with Puka Nacua out stayed under double his ~40%) and falsely marked Brian Robinson's growth
+  into a bigger role. It is replaced by a direct check:
+  (1) The low-snap star stays as it was before: under half his average in his other games THAT season;
+  a footnote only -- it does not remove a game from the second average. The "over double" rule is gone.
+  (2) A last-4 game is marked when a main teammate's status in it differs from today's: he took no
+  offensive snap in it and is active today, or he played in it and is Out or on injured reserve today.
+  Main teammates: the team's top 3 by targets this season among its WR and TE (for a WR or TE), its lead
+  carrier (for a back), and the starting QB -- the QB footnote's current starter: a game another QB
+  started is marked while the starter is active, and the games the starter played are marked when he is
+  Out or on IR today. Active today = not Out on the priced week's official report and not RES on his
+  latest roster listing; Questionable counts as active and is a flag on the screen row.
+  (3) The card names the cause: "2 of his last 4 came with Puka Nacua out. Nacua is active."; the reverse
+  "3 of his last 4 came with Breece Hall playing. Hall is Out."; for the QB, "... came with Lamar Jackson
+  at QB. Jackson is Out." (4) Unchanged: both averages on the card (the second "without the N games with
+  a lineup change"), the both-averages gate and "Not listed, lineup changed", short history under 3
+  remaining games, the cushion from the second average, and the week-8 pre-registration (the design
+  note's Later ideas). (5) settings.yaml's fewer_snaps_share comment now says the star is display only
+  (its value, 0.5, is unchanged).
 

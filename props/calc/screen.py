@@ -11,12 +11,12 @@ weights, no settings, no chance. The user's design (2026-10-11):
   rate against the needed rate (– below the card's minimum sample), the opponent's allowed rate
   against the needed rate (– when the card shows none), and the grade matchup (offense against
   defense; equal grades disagree).
-- Lineup check (DECISIONS #247): a last-4 game where his snap share was under half or over double his
-  share in his other games of the window, or with a different starting QB, is marked; the leg is listed
-  only if his last-4 average with AND without the marked games meets the bar, else it is named under
-  "Not listed, lineup changed".
+- Lineup check (DECISIONS #247): a last-4 game is marked when a main teammate's status then differs from
+  today's (out then and active now, or playing then and Out or on IR now; main teammates: his group's top 3
+  receivers or lead back, and the starting QB); the leg is listed only if his last-4 average with AND
+  without those games meets the bar, else it is named under "Not listed, lineup changed".
 - Order: the cushion in his own swing (#244's candidate C; DECISIONS #247): the workload gap -- his last-4
-  average without the marked games minus the bar, in units -- over his game-to-game swing (the standard
+  average without the lineup-changed games minus the bar, in units -- over his game-to-game swing (the standard
   deviation of his workload in the games his longer-run rate uses, up to 16, floored at 1 unit), biggest
   first; under 4 such games the cushion is n/a and the row sorts after every row that has one. The marks
   are shown, not counted, and only break ties.
@@ -44,7 +44,7 @@ TESTED = ("Tested on 2026 weeks 2-5: legs on this list hit about 50% on Overs an
 HEADER = ("This lists only legs where his recent workload already meets the bar at the price. Legs that "
           "depend on a role change -- more work than his recent games -- are not on it. " + TESTED)
 ORDER = ("Order: the cushion in his own swing, biggest first -- the workload gap (his last-4 average without any "
-         "game marked by the lineup check, minus the bar) over his game-to-game swing in the games behind his "
+         "game with a lineup change, minus the bar) over his game-to-game swing in the games behind his "
          "longer-run rate, at least 1 unit. It replaced the percent of the bar, which gave a low line a big number "
          "from one extra target; measured once in the 2026 test, its top rows did no better either. Under 4 games: "
          "n/a, ranked last. The ✓ and ✗ marks are shown, not counted: ✓ agrees, ✗ disagrees, – not enough data.")
@@ -147,8 +147,9 @@ def side_row(pl, c: dict, side: str, shown: dict, stub: dict, other_bar: float |
     row["passes"] = clean_ok
     row["lineup_out"] = None
     if full_ok and not clean_ok:
-        without = (f"{card.d1(P['usual_clean'])} without the {P['marked']} marked game{'s' if P['marked'] > 1 else ''}"
-                   if P["usual_clean"] is not None else f"all {len(P['rows'])} games are marked")
+        without = (f"{card.d1(P['usual_clean'])} without the {P['marked']} game{'s' if P['marked'] > 1 else ''} with a "
+                   f"lineup change" if P["usual_clean"] is not None
+                   else f"all {len(P['rows'])} games had a lineup change")
         row["lineup_out"] = (f"his last-4 average is {card.d1(usual)} but {without}, against {P['bar_text']}"
                              + ("; " + " ".join(pl.lineup) if pl.lineup else ""))
     sb = card.shown_work(P["bar"]) if P["bar"] is not None else None
@@ -211,7 +212,8 @@ def side_row(pl, c: dict, side: str, shown: dict, stub: dict, other_bar: float |
     if len(P["rows"]) < P["n"] or 0 < P["season_games"] < 4 or (usual is not None and P["n_clean"] < 3):
         row["flags"].append("short history")
     if P["marked"]:
-        row["flags"].append(f"lineup check: {P['marked']} of {len(P['rows'])} marked")
+        row["flags"].append(f"lineup change: {P['marked']} of {len(P['rows'])}")
+    row["flags"] += list(getattr(pl, "lineup_flags", []) or [])       # a main teammate Questionable today
     qb = str(shown.get("qb_today", ""))
     if qb.startswith("Starting QB not confirmed"):
         row["flags"].append("QB not confirmed")

@@ -357,11 +357,12 @@ Run it through `python nfl.py calc <command>` -- the same commands and arguments
    its sample, the cushion and the flags), then the full chat cards for the top 3 a side, each
    followed by its **Screen checks** table (the same ✓ and ✗). Each game has its header (rule 3).
    A player ruled Out is not ranked; the screen names him under "Not listed, ruled Out". The
-   lineup check marks a last-4 game with far fewer or far more snaps than usual, or a different
-   starting QB; a leg whose last-4 average meets the bar only with those games in is not ranked and
-   is named under "Not listed, lineup changed", with the reason -- say it when asked about him.
+   lineup check marks a last-4 game when a main teammate's status then differs from today's (out then
+   and active now, or playing then and Out or on IR now; main teammates: his group's top 3 receivers or
+   lead back, and the starting QB); a leg whose last-4 average meets the bar only with those games in is
+   not ranked and is named under "Not listed, lineup changed", with the reason -- say it when asked.
    The order is the cushion in his own swing, biggest first: the workload gap in units (his last-4
-   average without the marked games, minus the bar) over his game-to-game swing, printed as e.g.
+   average without the lineup-changed games, minus the bar) over his game-to-game swing, printed as e.g.
    "+1 target, 0.3 of his swing" (DECISIONS #247); the marks are shown, not counted. Show it as printed, with a Matchup
    read on each card (rule 3), and keep every card's Screen checks table. **A request for the
    strongest or best overs and unders runs the screen, and the reply LEADS with its test line**
