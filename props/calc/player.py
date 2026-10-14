@@ -387,6 +387,9 @@ def lineup_marks(b: Bundle, last: pd.DataFrame, gsis: str, team: str, pos: str, 
 
     marks = [False] * n
     lines, flags = [], []
+    published = wk_rep is not None and "team" in wk_rep and bool((wk_rep["team"] == team).any())
+    if not published:                            # a Tuesday read is not a Sunday one (the user, 2026-10-13; DECISIONS #248)
+        lines.append("Injury report not yet published: nobody counts as Out today.")
     for m in main_teammates(b, gsis, team, pos, season, week):
         gone = today(m)
         if status.get(m) == "Questionable" and not gone:

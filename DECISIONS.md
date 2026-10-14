@@ -9224,3 +9224,11 @@ Mumpfield leg; the freeze otherwise stands to 2026-11-02.
   note's Later ideas). (5) settings.yaml's fewer_snaps_share comment now says the star is display only
   (its value, 0.5, is unchanged).
 
+## 2026-10-13 (248) -- the screen and the cards say when the injury report is not published yet
+
+The user, after #247: the lineup check reads "Out today" from the priced week's official report, so
+before a team's report is out nobody counts as Out and a Tuesday read can look like a Sunday one. The
+screen's game header now says, per team, "Injury report not yet published: nobody counts as Out today."
+(it said "the week's injury report is not out yet."), and each card's lineup lines carry the same
+sentence when his team has no row on the week's report yet. No other change.
+
