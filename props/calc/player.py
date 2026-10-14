@@ -58,12 +58,13 @@ class Bundle:
     def injury_report(self, season: int):
         """The season's official injury report, read once; None when the file cannot be read (display
         only: the lineup check then cannot say a teammate is Out today)."""
-        if season not in self._injury_reports:
+        cache = self.__dict__.setdefault("_injury_reports", {})     # a Bundle built without __init__ (tests)
+        if season not in cache:
             try:
-                self._injury_reports[season] = data.injuries(season, manifest=self.manifest)
+                cache[season] = data.injuries(season, manifest=getattr(self, "manifest", None))
             except (OSError, ValueError, KeyError):    # a missing or unreadable file, never a code error
-                self._injury_reports[season] = None
-        return self._injury_reports[season]
+                cache[season] = None
+        return cache[season]
 
     def kickoffs(self) -> dict:
         """game_id -> kickoff time, from the schedule."""
@@ -339,8 +340,11 @@ def main_teammates(b: Bundle, gsis: str, team: str, pos: str, season: int, week:
     else:
         return []
     mine = plays[(plays["posteam"] == team) & (plays["gsis_id"] != gsis)]
+    if mine.empty:                               # no teammate plays yet (week 1): no main teammates
+        return []
     counts = mine.groupby("gsis_id").size().rename("n").reset_index()
-    counts = counts[[b.position_at(g, season, week) in group for g in counts["gsis_id"]]]
+    keep = counts["gsis_id"].map(lambda g: b.position_at(g, season, week) in group).astype(bool)
+    counts = counts[keep]
     return list(counts.sort_values(["n", "gsis_id"], ascending=[False, True])["gsis_id"].head(n))
 
 
