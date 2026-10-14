@@ -150,7 +150,7 @@ def side_row(pl, c: dict, side: str, shown: dict, stub: dict, other_bar: float |
         without = (f"{card.d1(P['usual_clean'])} without the {P['marked']} marked game{'s' if P['marked'] > 1 else ''}"
                    if P["usual_clean"] is not None else f"all {len(P['rows'])} games are marked")
         row["lineup_out"] = (f"his last-4 average is {card.d1(usual)} but {without}, against {P['bar_text']}"
-                             + (f"; {pl.lineup[0]}" if pl.lineup else ""))
+                             + ("; " + " ".join(pl.lineup) if pl.lineup else ""))
     sb = card.shown_work(P["bar"]) if P["bar"] is not None else None
     # the cushion in his own swing (#244's candidate C, DECISIONS #247): the gap in units over the standard
     # deviation of his workload in the games behind his longer-run rate, floored at 1 unit
@@ -235,8 +235,8 @@ def cushion_text(r: dict) -> str:
     if r.get("gap") is None:
         return "--"
     one, many = card.SHOW[r["market"]][1]
-    g = r["gap"]
-    gap = f"{'+' if g >= 0 or abs(g) < 0.05 else '−'}{card._num(abs(g))} {one if abs(g) == 1 else many}"
+    g = card.half_up(r["gap"], "0.5") + 0.0                # as the listing test rounds it: a listed leg is never short
+    gap = f"{'+' if g >= 0 else '−'}{card._num(abs(g))} {one if abs(g) == 1 else many}"
     if r.get("cushion") is None:
         return f"{gap}, n/a (under {SWING_MIN_GAMES} games)"
     z = card.d1(r["cushion"])

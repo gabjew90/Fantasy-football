@@ -384,7 +384,8 @@ def lineup_causes(b: Bundle, last: pd.DataFrame, gsis: str, team: str, pos: str,
     n, out = len(last), []
     for m in mates:
         name = names_.get(m, m)
-        surname = str(name).split()[-1]
+        words = [w for w in str(name).split() if w.rstrip(".").upper() not in ("JR", "SR", "II", "III", "IV", "V")]
+        surname = words[-1] if words else str(name)
         rostered = [(int(g["season"]), int(g["week"])) for _, g in marked.iterrows()
                     if len(ros[(ros["gsis_id"] == m) & (ros["team"] == team) & (ros["season"] == g["season"])
                                & (ros["week"] == g["week"])])]

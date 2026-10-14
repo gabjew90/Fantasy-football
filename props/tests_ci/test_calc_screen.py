@@ -405,3 +405,36 @@ def test_a_main_teammate_out_in_a_marked_game_is_named(monkeypatch):
                         "injury_report": lambda self, s: None})()
     assert player.lineup_causes(b2, last, "00-0000001", "LA", "WR", 2026, 5) == \
         ["2 of his last 4 came with Puka Nacua playing. Nacua is on injured reserve."]
+
+
+def test_the_screen_names_a_leg_the_lineup_check_drops_and_never_ranks_it(one_window, monkeypatch):
+    def lineup_card(b, name, market, side, **kw):
+        pl, c = _card(50.5)                    # bar ~14; his last 4 average 15.5, 12.0 without the two 19s
+        win = pl.window.copy()
+        win["fewer_snaps"] = False
+        win["more_snaps"] = False
+        last = win.tail(4)
+        win.loc[last.index[last["carries"] == 19], "more_snaps"] = True
+        pl.window, pl.lineup = win, ["2 of his last 4 came with Lead Back out. Back is active."]
+        return {"stub": STUB, "ready": True, "not_enough": False, "c": c, "pl": pl, "shown": SHOWN,
+                "text": "T", "md": "M", "md_game": "G"}
+    monkeypatch.setattr(CLI, "build_card", lineup_card)
+    out = CLI.screen(_screen_args())
+    assert "Not listed, lineup changed:" in out
+    assert "- Test Back rushing yards over: his last-4 average is 15.5 but 12.0 without the 2 marked games" in out
+    assert "| 1 | Test Back (DAL) · rushing yards Over" not in out, "a dropped leg is never ranked"
+    assert "Lead Back out" in out
+
+
+def test_a_suffix_is_not_a_surname(monkeypatch):
+    from props.calc import player
+    last = pd.DataFrame({"season": [2026] * 4, "week": [1, 2, 3, 4], "game_id": ["g1", "g2", "g3", "g4"],
+                         "fewer_snaps": [False, True, False, False], "more_snaps": [False] * 4})
+    ros = pd.DataFrame([{"season": 2026, "week": w, "team": "ATL", "gsis_id": "00-0000002",
+                         "full_name": "Brian Robinson Jr.", "status": "ACT", "position": "RB"} for w in (1, 2, 3, 4, 5)])
+    b = type("B", (), {"rosters": ros, "snap_share": pd.DataFrame({"game_id": [], "gsis_id": [], "offense_pct": []}),
+                       "injury_report": lambda self, s: None})()
+    monkeypatch.setattr(player, "main_teammates", lambda *a: ["00-0000002"])
+    assert player.lineup_causes(b, last, "00-0000001", "ATL", "RB", 2026, 5) == \
+        ["1 of his last 4 came with Brian Robinson Jr. out. Robinson is active."]
+

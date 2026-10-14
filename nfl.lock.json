@@ -121,9 +121,9 @@
   "props/calc/names.py": "9eaa5617dd8d5ad2758ab529976928fb34b05d938b7eddbb7ab97fb5d555339c",
   "props/calc/odds.py": "e0096cc1f7b98e885268b8f01ac475260be75af3a5cc18485224b3e10a562c8f",
   "props/calc/opponent.py": "1a657b51f9b0463c8e6c9598a490ddd81e1270911a164777828b3c524a4b65f0",
-  "props/calc/player.py": "9b2c1b6f6e0dcad5c2fe27429b353d7ea6f461c82c61072f940b3d4726c0fd7c",
+  "props/calc/player.py": "e4e423023ea024065adb7aa2ad07a3a423d9b292b8461491cde72c7c07e2eaaa",
   "props/calc/rates.py": "0f29f11067e197df4375ffde997b0059757efd407a2e4bbdbcb8a0ea9793ed0f",
-  "props/calc/screen.py": "abdcd79d3ea09cc047d7d5d738193458679b6f3c434c5688753329e8401b5c13",
+  "props/calc/screen.py": "1a5736d07aa0890e626e5ce94d3bd2e433b66484116fbb8033453bfb0a214b74",
   "props/calc/settings.py": "0e4dae8cd1a3be3ac6fc416d6a9048fa362d8427abb445f957c974da98a8ba3d",
   "props/calc/settings.yaml": "f5c596332e12cf83279ae92c896d12381db2bf8e43987c4fc574ebf55c4d1196",
   "props/calc/shared.py": "bb20cc5a866ead132cbac6f90b991bd6ce0e26ef38bef2464e5102c7f8914932",
@@ -206,6 +206,6 @@
   "scripts/bootstrap.py": "8c6c428d7b66fde19ea8894d5124a0c182ba3f9719db6031f4904459e3b8cdd7",
   "scripts/release.py": "0bdf24c73b040deb17c649e9d7badb9a71edaac6a6044f237be6e0e246ee804e"
  },
- "sha256": "39c001470d42bf737f2b18ec4b0a615764ef04ef57f52a6f9d320576f855ea9e",
+ "sha256": "d5f2281da1583be4fddd9f52258af4e9327f521dbc60295e0fe7e7a5fa6eaf0d",
  "tag": "nfl-v1.83"
 }
