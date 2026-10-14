@@ -235,12 +235,16 @@ def cushion_text(r: dict) -> str:
     if r.get("gap") is None:
         return "--"
     one, many = card.SHOW[r["market"]][1]
-    g = card.half_up(r["gap"], "0.5") + 0.0                # as the listing test rounds it: a listed leg is never short
+    # the same gap the cushion divides, to one decimal; a listed leg's gap just under 0 (the listing test rounds
+    # the ask to the nearest half, so -0.2 lists) prints as +0, never as short of the bar
+    g = round(r["gap"], 1) + 0.0
+    zero = -0.25 < g < 0.05
+    g = 0.0 if zero else g
     gap = f"{'+' if g >= 0 else '−'}{card._num(abs(g))} {one if abs(g) == 1 else many}"
     if r.get("cushion") is None:
         return f"{gap}, n/a (under {SWING_MIN_GAMES} games)"
-    z = card.d1(r["cushion"])
-    return f"{gap}, {'0.0' if z in ('-0.0', '0.0') else z} of his swing"
+    z = "0.0" if zero else card.d1(r["cushion"])
+    return f"{gap}, {'0.0' if z == '-0.0' else z} of his swing"
 
 
 def _leg(r: dict) -> str:
