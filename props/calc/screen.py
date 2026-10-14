@@ -11,12 +11,20 @@ weights, no settings, no chance. The user's design (2026-10-11):
   rate against the needed rate (– below the card's minimum sample), the opponent's allowed rate
   against the needed rate (– when the card shows none), and the grade matchup (offense against
   defense; equal grades disagree).
-- Order: the workload cushion as a percent of the bar, biggest first; the marks are shown, not counted,
-  and only break ties (DECISIONS #243; kept after the #244 test).
+- Lineup check (DECISIONS #247): a last-4 game where his snap share was under half or over double his
+  share in his other games of the window, or with a different starting QB, is marked; the leg is listed
+  only if his last-4 average with AND without the marked games meets the bar, else it is named under
+  "Not listed, lineup changed".
+- Order: the cushion in his own swing (#244's candidate C; DECISIONS #247): the workload gap -- his last-4
+  average without the marked games minus the bar, in units -- over his game-to-game swing (the standard
+  deviation of his workload in the games his longer-run rate uses, up to 16, floored at 1 unit), biggest
+  first; under 4 such games the cushion is n/a and the row sorts after every row that has one. The marks
+  are shown, not counted, and only break ties.
 
-Tested on 2026 weeks 2-5 (DECISIONS #244): legs on the list hit about 50% on Overs and 53% on Unders
-against about 56% needed, and the top-ranked rows did no better; the header says so on every run
-(TESTED)."""
+Tested on 2026 weeks 2-5 (DECISIONS #244), when the order was the cushion as a percent of the bar: legs
+on the list hit about 50% on Overs and 53% on Unders against about 56% needed, and the top-ranked rows did
+no better; the header says so on every run (TESTED). The swing order (C) was measured once in the same
+test and did no better either."""
 
 from __future__ import annotations
 
@@ -32,12 +40,16 @@ DAYS = {"mon": 0, "tue": 1, "wed": 2, "thu": 3, "fri": 4, "sat": 5, "sun": 6}
 JOURNAL_MARKET = {v: k for k, v in ARCHIVE_MARKET.items()}      # calc's name -> the journal's (settle's)
 # the measured result (DECISIONS #244, the report's own numbers): every leg at the bar, Overs 50.0% and Unders
 # 52.9% against 56.1% / 56.4% needed (354 + 522 graded legs); cushion's top 3 per side, 311 graded legs, did no better
-TESTED = ("Tested on 2026 weeks 2-5: legs on this list hit about 50% on Overs and 53% on Unders (876 graded legs), against about 56% needed. The top-ranked rows (311 graded legs) did no better. This is a way to read the slate, not a list of likely winners.")
+TESTED = ("Tested on 2026 weeks 2-5: legs on this list hit about 50% on Overs and 53% on Unders (876 graded legs), against about 56% needed. The top-ranked rows under the order used then, the cushion as a percent of the bar (311 graded legs), did no better. This is a way to read the slate, not a list of likely winners.")
 HEADER = ("This lists only legs where his recent workload already meets the bar at the price. Legs that "
           "depend on a role change -- more work than his recent games -- are not on it. " + TESTED)
-ORDER = ("Order: the workload cushion as a percent of the bar, biggest first (kept after the 2026 test: no other "
-         "order beat it by the margin set in advance; a low line gets a big percent from one extra target or carry). The ✓ and ✗ marks are "
-         "shown, not counted: ✓ agrees, ✗ disagrees, – not enough data.")
+ORDER = ("Order: the cushion in his own swing, biggest first -- the workload gap (his last-4 average without any "
+         "game marked by the lineup check, minus the bar) over his game-to-game swing in the games behind his "
+         "longer-run rate, at least 1 unit. It replaced the percent of the bar, which gave a low line a big number "
+         "from one extra target; measured once in the 2026 test, its top rows did no better either. Under 4 games: "
+         "n/a, ranked last. The ✓ and ✗ marks are shown, not counted: ✓ agrees, ✗ disagrees, – not enough data.")
+SWING_FLOOR = 1.0              # the swing is never less than 1 unit (DECISIONS #247)
+SWING_MIN_GAMES = 4            # fewer games behind his rate: no cushion (n/a), ranked after every row with one
 TOP = 8
 REPLAY = ("Past week: rebuilt from the saved line history -- the newest saved Sleeper quote before each "
           "kickoff, which may differ from the quote a live screen saw (a later capture at the same line "
@@ -110,8 +122,10 @@ def _cmp(side: str, value: float, need: float) -> bool:
 
 
 def side_row(pl, c: dict, side: str, shown: dict, stub: dict, other_bar: float | None) -> dict:
-    """One side of one line, from the card's own parts. Keys: passes (workload meets the bar), marks
-    [(name, mark, text)], cushion (percent of the bar), and the display cells."""
+    """One side of one line, from the card's own parts. Keys: passes (workload meets the bar with and
+    without the lineup check's marked games), lineup_out (the reason it is not listed when only the
+    marked games carried it), marks [(name, mark, text)], cushion (the gap over his swing), gap (units),
+    swing, and the display cells."""
     P = card._parts(pl, c, side)
     m = c["market"]
     many = P["many"]
@@ -124,12 +138,28 @@ def side_row(pl, c: dict, side: str, shown: dict, stub: dict, other_bar: float |
            "mult": c[f"mult_{side}"], "gsis_id": stub["gsis_id"], "game_id": stub["game_id"], "week": stub["week"],
            "season": stub["season"], "bar": P["bar"], "flags": []}
     usual = c["usual"]
-    row["passes"] = bool(P["bar"] is not None and usual is not None
-                         and (card.half_up(P["work_ask"], "0.5") <= 0 if side == "over"
-                              else card.half_up(P["work_ask"], "0.5") >= 0))
+
+    def meets(ask):
+        return ask is not None and (card.half_up(ask, "0.5") <= 0 if side == "over" else card.half_up(ask, "0.5") >= 0)
+    full_ok = bool(P["bar"] is not None and usual is not None and meets(P["work_ask"]))
+    # the lineup check (DECISIONS #247): the average without the marked games must meet the bar too
+    clean_ok = full_ok and (not P["marked"] or meets(P["work_ask_clean"]))
+    row["passes"] = clean_ok
+    row["lineup_out"] = None
+    if full_ok and not clean_ok:
+        without = (f"{card.d1(P['usual_clean'])} without the {P['marked']} marked game{'s' if P['marked'] > 1 else ''}"
+                   if P["usual_clean"] is not None else f"all {len(P['rows'])} games are marked")
+        row["lineup_out"] = (f"his last-4 average is {card.d1(usual)} but {without}, against {P['bar_text']}"
+                             + (f"; {pl.lineup[0]}" if pl.lineup else ""))
     sb = card.shown_work(P["bar"]) if P["bar"] is not None else None
-    row["cushion"] = (((-P["work_ask"]) if side == "over" else P["work_ask"]) / sb * 100) \
-        if P["work_ask"] is not None and sb else None
+    # the cushion in his own swing (#244's candidate C, DECISIONS #247): the gap in units over the standard
+    # deviation of his workload in the games behind his longer-run rate, floored at 1 unit
+    ask = P["work_ask_clean"] if P["marked"] else P["work_ask"]
+    gap = ((-ask) if side == "over" else ask) if ask is not None else None
+    col = workload_col(m)
+    swing = (max(float(pl.window[col].std(ddof=1)), SWING_FLOOR) if len(pl.window) >= SWING_MIN_GAMES else None)
+    row["gap"], row["swing"] = gap, swing
+    row["cushion"] = gap / swing if gap is not None and swing is not None else None
     row["workload"] = (f"{card.d1(usual)} avg vs {P['bar_text']}" if P["bar"] is not None and usual is not None
                        else P["bar_text"])
     longer = card.shown_rate(P["assumed"])
@@ -178,8 +208,10 @@ def side_row(pl, c: dict, side: str, shown: dict, stub: dict, other_bar: float |
     row["x"] = sum(mk == "✗" for _, mk, _ in marks)
     row["ok"] = sum(mk == "✓" for _, mk, _ in marks)
     # flags
-    if len(P["rows"]) < P["n"] or 0 < P["season_games"] < 4:
+    if len(P["rows"]) < P["n"] or 0 < P["season_games"] < 4 or (usual is not None and P["n_clean"] < 3):
         row["flags"].append("short history")
+    if P["marked"]:
+        row["flags"].append(f"lineup check: {P['marked']} of {len(P['rows'])} marked")
     qb = str(shown.get("qb_today", ""))
     if qb.startswith("Starting QB not confirmed"):
         row["flags"].append("QB not confirmed")
@@ -192,11 +224,23 @@ def side_row(pl, c: dict, side: str, shown: dict, stub: dict, other_bar: float |
 
 
 def rank(rows: list[dict]) -> list[dict]:
-    """Workload passes only, biggest cushion first (the user, 2026-10-11, DECISIONS #243: it was fewest ✗,
-    then most ✓, then cushion; the marks are now shown, not counted, until the orders are measured);
-    ties: fewest ✗, then most ✓."""
+    """Listed legs only (both averages meet the bar), biggest cushion in his swing first (DECISIONS #247);
+    a row with no cushion (under 4 games) after every row that has one; ties: fewest ✗, then most ✓."""
     return sorted((r for r in rows if r["passes"]),
-                  key=lambda r: (-(r["cushion"] if r["cushion"] is not None else -1e9), r["x"], -r["ok"]))
+                  key=lambda r: (r["cushion"] is None, -(r["cushion"] or 0.0), r["x"], -r["ok"]))
+
+
+def cushion_text(r: dict) -> str:
+    """'+1 target, 0.3 of his swing'; with no cushion, the gap and 'n/a (under 4 games)'."""
+    if r.get("gap") is None:
+        return "--"
+    one, many = card.SHOW[r["market"]][1]
+    g = r["gap"]
+    gap = f"{'+' if g >= 0 or abs(g) < 0.05 else '−'}{card._num(abs(g))} {one if abs(g) == 1 else many}"
+    if r.get("cushion") is None:
+        return f"{gap}, n/a (under {SWING_MIN_GAMES} games)"
+    z = card.d1(r["cushion"])
+    return f"{gap}, {'0.0' if z in ('-0.0', '0.0') else z} of his swing"
 
 
 def _leg(r: dict) -> str:
@@ -212,7 +256,7 @@ def table(rows: list[dict], title: str) -> list[str]:
             "|---|---|---|---|---|---|---|---|---|---|"]
     for i, r in enumerate(rows, 1):
         marks = {n: t for n, _, t in r["marks"]}
-        cush = f"{round(r['cushion']) + 0:+d}%" if r["cushion"] is not None else "--"
+        cush = cushion_text(r)
         out.append("| " + " | ".join(card._cell(x) for x in (
             i, _leg(r), r["workload"], r["longer"], marks["consistency"], marks["season rate"], marks["opponent"],
             marks["grades"], cush, " · ".join(r["flags"]) or "--")) + " |")
@@ -223,7 +267,7 @@ def checks(r: dict, md: bool) -> str:
     """The row's checks, printed under its card (the user, 2026-10-11): the workload with his longer-run
     rate, each mark with its sample, the cushion and the flags -- the same cells as its table row."""
     marks = [(n, t) for n, _, t in r["marks"]]
-    cush = f"{round(r['cushion']) + 0:+d}% of the bar" if r["cushion"] is not None else "--"
+    cush = cushion_text(r)
     rows = ([("Workload", r["workload"]), ("Longer-run rate", r["longer"])]
             + [(n[0].upper() + n[1:], t) for n, t in marks]
             + [("Cushion", cush), ("Flags", " · ".join(r["flags"]) or "--")])

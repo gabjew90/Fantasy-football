@@ -9185,3 +9185,38 @@ the #245 freeze. One PR, no design change.
 - **Later ideas:** one pre-registered question for the week-8 rerun (QB or teammate changes inside a
   leg's last 4 games), its definition fixed before the data exists.
 
+## 2026-10-13 (247) -- the screen orders by the cushion in his swing; a lineup check on the last-4 average (the freeze lifted for these two)
+
+The user lifted the #245 freeze for these two changes, "to avoid making dumb bets" after the week-5
+Mumpfield leg; the freeze otherwise stands to 2026-11-02.
+
+- **The cushion is the gap over his swing (A).** The percent of the bar was wrong: one target of room on a
+  2.5 bar printed +40% (Mumpfield) while two targets on an 8 bar printed +28% (Shakir). The cushion is now
+  #244's candidate C as tested: the workload gap (his last-4 average minus the bar, in units, as the card
+  shows them) over his game-to-game swing, the standard deviation of his workload in the games his
+  longer-run rate uses (up to 16). Settled by the user: the swing is floored at 1 unit; under 4 such games
+  the cushion is n/a and the row sorts after every row with one. Ties as before (fewest ✗, most ✓). The
+  row and the card's Screen checks print the unit gap and the swing cushion ("+1 target, 0.3 of his
+  swing"); the percent is gone from the row, the Screen checks, ORDER, CHAT.md rule 8 and the screen's
+  docstring (the parlay-leg design note never carried it). Nothing is retuned or re-fit: the bar, the
+  rates and settings.yaml's values are unchanged. The test line still describes what was tested -- the
+  percent order (#244: top 3 a side -8.7 points against break-even) -- and says so; the live order is now
+  C, which #244 measured once on the same legs (top 3 a side: Overs -10.6, Unders -4.8; no better).
+- **A lineup check on the last-4 average (B).** (1) A last-4 game is marked when his offensive snap share
+  was under half OR over double his share in his other games of the window -- the games behind his
+  longer-run rate, as the swing -- the same 0.5 threshold both ways (fewer_snaps_share; it used to mark only
+  the low side, against his other games that season). A game with a different starting QB is marked as
+  before. (2) For each snap-marked game the card looks for a cause among his position group's main
+  players (WR/TE: the team's top 3 receivers by targets this season; RB: the lead carrier): one on the
+  roster that week with no offensive snap ("2 of his last 4 came with Puka Nacua out. Nacua is active."),
+  or one who played in it and is Out today or on injured reserve; the QB footnote covers a QB change.
+  (3) The card prints both averages, the last 4 and the last 4 without the marked games; "Short history"
+  fires when fewer than 3 games remain. (4) The screen lists a leg only when both averages meet the bar;
+  otherwise it is named under "Not listed, lineup changed" with the reason; the cushion uses the average
+  without the marked games. (5) The week-8 rerun's pre-registration gains the hit rate of the legs this
+  check would have removed against those it kept, weeks 2-5 and 6-8 separately (the design note's Later
+  ideas).
+- **What the snap rule does not catch:** a player whose share rose without crossing double his average.
+  Mumpfield's weeks 2-3 with Nacua out (69% and 73%) are under double his window average (about 40%), so
+  no game of his is marked; the replay shows where he lands (the PR's report).
+

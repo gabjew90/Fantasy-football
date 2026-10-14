@@ -340,7 +340,7 @@ Run it through `python nfl.py calc <command>` -- the same commands and arguments
       calculator did not print.
    5. Label each entry by its view ("Entry if you think Jeanty is limited") -- never "best",
       "recommended", a chance or an edge. Every assembled entry carries the test line, as the
-      screen prints it: "Tested on 2026 weeks 2-5: legs on this list hit about 50% on Overs and 53% on Unders (876 graded legs), against about 56% needed. The top-ranked rows (311 graded legs) did no better. This is a way to read the slate, not a list of likely winners."
+      screen prints it: "Tested on 2026 weeks 2-5: legs on this list hit about 50% on Overs and 53% on Unders (876 graded legs), against about 56% needed. The top-ranked rows under the order used then, the cushion as a percent of the bar (311 graded legs), did no better. This is a way to read the slate, not a list of likely winners."
    6. Every number in the bullets and the entries is copied from a card or the entry output. The
       self-check compares each one with its source before sending (the reply that prompted this
       rule had Bowers' line as 73.5 instead of 74.5, and swapped the needed rates between Bowers
@@ -356,9 +356,13 @@ Run it through `python nfl.py calc <command>` -- the same commands and arguments
    four marks -- consistency, season rate, opponent's allowed rate, grades -- each ✓, ✗ or – with
    its sample, the cushion and the flags), then the full chat cards for the top 3 a side, each
    followed by its **Screen checks** table (the same ✓ and ✗). Each game has its header (rule 3).
-   A player ruled Out is not ranked; the screen names him under "Not listed, ruled Out".
-   The order is the cushion as a percent of the bar, biggest first (kept after the 2026 test: no
-   other order beat it by the margin set in advance); the marks are shown, not counted. Show it as printed, with a Matchup
+   A player ruled Out is not ranked; the screen names him under "Not listed, ruled Out". The
+   lineup check marks a last-4 game with far fewer or far more snaps than usual, or a different
+   starting QB; a leg whose last-4 average meets the bar only with those games in is not ranked and
+   is named under "Not listed, lineup changed", with the reason -- say it when asked about him.
+   The order is the cushion in his own swing, biggest first: the workload gap in units (his last-4
+   average without the marked games, minus the bar) over his game-to-game swing, printed as e.g.
+   "+1 target, 0.3 of his swing" (DECISIONS #247); the marks are shown, not counted. Show it as printed, with a Matchup
    read on each card (rule 3), and keep every card's Screen checks table. **A request for the
    strongest or best overs and unders runs the screen, and the reply LEADS with its test line**
    (the header's "Tested on 2026 weeks 2-5 ..." sentence, word for word): legs on the list hit

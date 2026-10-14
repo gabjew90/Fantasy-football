@@ -53,6 +53,17 @@ class Bundle:
         pos = r.drop_duplicates(["season", "gsis_id"], keep="last")
         self.position = {(s, g): p for s, g, p in zip(pos["season"], pos["gsis_id"], pos["position"])}
         self._pools: dict = {}
+        self._injury_reports: dict = {}
+
+    def injury_report(self, season: int):
+        """The season's official injury report, read once; None when the file cannot be read (display
+        only: the lineup check then cannot say a teammate is Out today)."""
+        if season not in self._injury_reports:
+            try:
+                self._injury_reports[season] = data.injuries(season, manifest=self.manifest)
+            except (OSError, ValueError, KeyError):    # a missing or unreadable file, never a code error
+                self._injury_reports[season] = None
+        return self._injury_reports[season]
 
     def kickoffs(self) -> dict:
         """game_id -> kickoff time, from the schedule."""
@@ -204,6 +215,7 @@ class Player:
     no_depth: int = 0                                 # his targets without a recorded depth
     receiving: dict = field(default_factory=dict)     # rec_yds: catch rate, yards per catch, depth mix, pools
     passing: dict = field(default_factory=dict)       # pass_yds: depth mix and the starters' completion pools
+    lineup: list = field(default_factory=list)        # the lineup check's cause lines for his marked last-4 games
 
     def usual(self, market: str, games: int) -> float | None:
         """His average workload over his last `games` games played; None with
@@ -314,6 +326,80 @@ def backup_qb(mine: pd.DataFrame, schedule: pd.DataFrame, team: str, season: int
     return mine.assign(backup_qb=marks, qb_started=names_)
 
 
+def snap_marks(window: pd.DataFrame, k: float) -> pd.DataFrame:
+    """The lineup check's snap marks (the user, 2026-10-13, DECISIONS #247): a game where his offensive
+    snap share was under k times OR over 1/k times his average share in his OTHER games of the window
+    (the games his longer-run rate uses) -- fewer_snaps / more_snaps. k is fewer_snaps_share, the same
+    threshold both ways. A game with no share, or no other game with one, is not marked. Display and the
+    screen's gate only: no rate or bar reads it."""
+    if window.empty or "snap_pct" not in window:
+        return window.assign(fewer_snaps=False, more_snaps=False)
+    pct = pd.to_numeric(window["snap_pct"], errors="coerce").to_numpy()
+    low, high = [], []
+    for i, p in enumerate(pct):
+        others = pd.Series([x for j, x in enumerate(pct) if j != i]).dropna()
+        ok = pd.notna(p) and len(others) > 0
+        avg = float(others.mean()) if len(others) else float("nan")
+        low.append(bool(ok and p < k * avg))
+        high.append(bool(ok and p > avg / k))
+    return window.assign(fewer_snaps=low, more_snaps=high)
+
+
+def main_teammates(b: Bundle, gsis: str, team: str, pos: str, season: int, week: int) -> list[str]:
+    """His position group's main players (the user, 2026-10-13): WR/TE -- the team's top 3 receivers
+    (WR or TE) by targets this season before the priced week; RB -- its lead carrier by carries. He is
+    never his own teammate. Ties go to the smaller gsis id, so the list is stable."""
+    if pos in ("WR", "TE"):
+        plays, group, n = b.cut(b.targets[b.targets["season"] == season], season, week, "targets"), ("WR", "TE"), 3
+    elif pos == "RB":
+        plays, group, n = b.cut(b.carries[b.carries["season"] == season], season, week, "carries"), ("RB",), 1
+    else:
+        return []
+    mine = plays[(plays["posteam"] == team) & (plays["gsis_id"] != gsis)]
+    counts = mine.groupby("gsis_id").size().rename("n").reset_index()
+    counts = counts[[b.position_at(g, season, week) in group for g in counts["gsis_id"]]]
+    return list(counts.sort_values(["n", "gsis_id"], ascending=[False, True])["gsis_id"].head(n))
+
+
+def lineup_causes(b: Bundle, last: pd.DataFrame, gsis: str, team: str, pos: str, season: int, week: int) -> list[str]:
+    """One line per main teammate behind his marked last-4 games (snap-marked; a different starting QB is
+    explained by the QB footnote the card already prints): a main teammate on his team's roster that week
+    who took no offensive snap -- "2 of his last 4 came with Puka Nacua out. Nacua is active." -- or one
+    who played in it and is Out or on injured reserve now. 'Now' is the priced week's official report
+    (Out) and his latest roster listing (RES = injured reserve). Display only."""
+    marked = last[last["fewer_snaps"] | last["more_snaps"]]
+    if marked.empty:
+        return []
+    mates = main_teammates(b, gsis, team, pos, season, week)
+    if not mates:
+        return []
+    played = set(zip(b.snap_share["game_id"], b.snap_share["gsis_id"]))
+    ros = b.rosters
+    rep = b.injury_report(season)
+    now_out = set() if rep is None else set(rep[(rep["season"] == season) & (rep["week"] == week)
+                                                & (rep["report_status"] == "Out")]["gsis_id"])
+    latest = ros[(ros["season"] == season) & (ros["week"] <= week)].sort_values("week").drop_duplicates("gsis_id", keep="last")
+    on_ir = set(latest[latest["status"].astype(str).str.startswith("RES")]["gsis_id"]) if "status" in latest else set()
+    names_ = dict(zip(ros["gsis_id"], ros["full_name"]))
+    n, out = len(last), []
+    for m in mates:
+        name = names_.get(m, m)
+        surname = str(name).split()[-1]
+        rostered = [(int(g["season"]), int(g["week"])) for _, g in marked.iterrows()
+                    if len(ros[(ros["gsis_id"] == m) & (ros["team"] == team) & (ros["season"] == g["season"])
+                               & (ros["week"] == g["week"])])]
+        absent = sum(1 for (_, g) in marked.iterrows()
+                     if (int(g["season"]), int(g["week"])) in rostered and (g["game_id"], m) not in played)
+        present = sum(1 for _, g in marked.iterrows() if (g["game_id"], m) in played)
+        gone = "on injured reserve" if m in on_ir else ("Out today" if m in now_out else None)
+        if absent:
+            out.append(f"{absent} of his last {n} came with {name} out. {surname} is "
+                       + (f"{gone} again." if gone else "active."))
+        if present and gone:
+            out.append(f"{present} of his last {n} came with {name} playing. {surname} is {gone}.")
+    return out
+
+
 def _results(b: Bundle, games: pd.DataFrame, margin: int) -> pd.DataFrame:
     """Add his team's margin, result group and starting QB to player_games rows."""
     sch = b.schedule.set_index("game_id")
@@ -357,10 +443,11 @@ def build(b: Bundle, gsis: str, name: str, team: str, season: int, week: int,
     mine = b.cut(b.games[b.games["gsis_id"] == gsis], season, week, "his games").sort_values(["season", "week"])
     mine = fewer_snaps(mine, b.snap_share, float(fixed["fewer_snaps_share"]))
     mine = backup_qb(mine, b.schedule, team, season, week)
-    window = mine.tail(int(fixed["rate_window_games"]))
+    window = snap_marks(mine.tail(int(fixed["rate_window_games"])), float(fixed["fewer_snaps_share"]))
     this = _results(b, mine[mine["season"] == season], int(fixed["result_margin"]))
     pools = b.pools(season, int(fixed["pool_seasons"]))
-    pl = Player(gsis, name, team, pos, season, week, window, this, pools=pools)
+    pl = Player(gsis, name, team, pos, season, week, window, this, pools=pools,
+                lineup=lineup_causes(b, window.tail(int(fixed["usual_games"])), gsis, team, pos, season, week))
     keys = pd.MultiIndex.from_frame(window[["season", "week"]]) if len(window) else None
 
     def own(df):

@@ -76,8 +76,11 @@ def test_grades_order_from_s_plus_down_to_f_minus():
 
 
 def test_an_over_with_his_workload_at_the_bar_and_every_mark_agreeing():
-    r = _row(40.5, "over")                     # bar ~11 carries, his last 4 average 15.5, needed 3.0 a carry
-    assert r["passes"] and r["cushion"] == pytest.approx((15.5 - 11) / 11 * 100)
+    pl, _ = _card(40.5)
+    r = _row(40.5, "over", pl=pl)              # bar ~11 carries, his last 4 average 15.5, needed 3.0 a carry
+    swing = max(float(pl.window["carries"].std(ddof=1)), 1.0)
+    assert r["passes"] and r["gap"] == pytest.approx(4.5) and r["cushion"] == pytest.approx(4.5 / swing)
+    assert S.cushion_text(r) == f"+4.5 carries, {card.d1(4.5 / swing)} of his swing"
     assert [(n, m) for n, m, _ in r["marks"]] == [("consistency", "✓"), ("season rate", "✓"), ("opponent", "✓"),
                                                   ("grades", "✓")]
     marks = {n: t for n, _, t in r["marks"]}
@@ -105,8 +108,9 @@ def test_each_mark_disagrees_or_has_no_data_on_its_own_terms():
 
 
 def test_an_under_mirrors_every_check():
-    r = _row(75.5, "under")                    # bar ~18 or fewer, his average 15.5
-    assert r["passes"] and r["cushion"] == pytest.approx((18 - 15.5) / 18 * 100)
+    pl, _ = _card(75.5)
+    r = _row(75.5, "under", pl=pl)             # bar ~18 or fewer, his average 15.5
+    assert r["passes"] and r["cushion"] == pytest.approx(2.5 / max(float(pl.window["carries"].std(ddof=1)), 1.0))
     marks = {n: (m, t) for n, m, t in r["marks"]}
     assert marks["consistency"] == ("✗", "✗ 2 of 4 at 18 or fewer")          # 12, 12 at or under; 19, 19 over
     assert marks["season rate"][0] == "✓" and marks["opponent"][0] == "✓"     # 3.9 and 4.4 at or below 4.9
@@ -135,9 +139,23 @@ def test_the_order_is_the_cushion_and_the_marks_only_break_ties():
             dict(base, name="one disagrees", x=1, ok=3, cushion=90.0),
             dict(base, name="tie, two agree", x=0, ok=2, cushion=40.0),
             dict(base, name="tie, one disagrees", x=1, ok=2, cushion=40.0),
-            dict(base, name="short of the bar", x=0, ok=4, cushion=-5.0, passes=False)]
+            dict(base, name="short of the bar", x=0, ok=4, cushion=-5.0, passes=False),
+            dict(base, name="under 4 games", x=0, ok=4, cushion=None)]
     assert [r["name"] for r in S.rank(rows)] == ["one disagrees", "no evidence", "tie, two agree",
-                                                 "tie, one disagrees", "four agree"]
+                                                 "tie, one disagrees", "four agree", "under 4 games"]
+
+
+def test_the_cushion_is_the_gap_over_his_swing_not_a_percent_of_the_bar():
+    """DECISIONS #247: one target of room on a 2.5 bar printed +40% and outranked two targets on an 8
+    bar (+28%). In his own swing (floored at 1 unit) the low line no longer wins on size alone."""
+    low = {"market": "receptions", "gap": 1.0, "swing": 2.6, "cushion": 1.0 / 2.6}
+    high = {"market": "receptions", "gap": 2.0, "swing": 2.3, "cushion": 2.0 / 2.3}
+    assert S.cushion_text(low) == "+1 target, 0.4 of his swing"
+    assert S.cushion_text(high) == "+2 targets, 0.9 of his swing"
+    base = {"passes": True, "x": 0, "ok": 0}
+    assert [r["gap"] for r in S.rank([dict(base, **low), dict(base, **high)])] == [2.0, 1.0]
+    assert S.cushion_text({"market": "rush_yds", "gap": 3.0, "cushion": None}) == "+3 carries, n/a (under 4 games)"
+    assert "% of the bar" not in S.ORDER and "percent of the bar" in S.TESTED
 
 
 # ---------------------------------------------------------------- the record
@@ -191,7 +209,7 @@ def test_the_screen_prints_its_caveats_tables_and_top_cards(one_window):
     for must in ("This lists only legs where his recent workload already meets the bar at the price.",
                  "Legs that depend on a role change", "Tested on 2026 weeks 2-5: legs on this list hit about 50%",
                  "This is a way to read the slate, not a list of likely winners.",
-                 "Order: the workload cushion as a percent of the bar, biggest first"):
+                 "Order: the cushion in his own swing, biggest first"):
         assert must in out
     assert "ARI Out: Hurt Guy. Doubtful or Questionable: none." in out
     assert "DAL Out: none. Doubtful or Questionable: Test Back (Questionable)." in out
@@ -332,3 +350,58 @@ def test_captures_left_inside_an_earlier_release_folder_are_read(tmp_path, monke
     (root / "nfl-v1.81.stamp.json").write_text("{}", encoding="utf-8")
     assert lines._earlier_release_lines(new) == [old / "props" / "calc" / "lines"]
     assert lines._earlier_release_lines(old) == [], "no stamp beside it: not a chat release"
+
+
+# ---------------------------------------------------------------- the lineup check (DECISIONS #247)
+
+def test_snap_marks_flag_far_fewer_and_far_more_snaps_than_his_other_games():
+    from props.calc import player
+    w = pd.DataFrame({"snap_pct": [0.40, 0.42, 0.18, 0.95, 0.41, None]})
+    out = player.snap_marks(w, 0.5)
+    assert list(out["fewer_snaps"]) == [False, False, True, False, False, False], "0.18 is under half his other games"
+    assert list(out["more_snaps"]) == [False, False, False, True, False, False], "0.95 is over double"
+
+
+def test_both_averages_print_and_the_gate_names_a_leg_the_marked_games_carry():
+    pl, c = _card(40.5)                        # bar ~11 carries, his last 4 average 15.5 (two 19s, two 12s)
+    win = pl.window.copy()
+    win["more_snaps"] = False
+    win["fewer_snaps"] = False
+    last = win.tail(4)
+    win.loc[last.index[last["carries"] == 19], "more_snaps"] = True     # mark the two 19-carry games: 12 and 12 remain
+    pl.window = win
+    pl.lineup = ["2 of his last 4 came with Lead Back out. Back is active."]
+    P = card._parts(pl, c, "over")
+    assert P["marked"] == 2 and P["usual_clean"] == pytest.approx(12.0) and P["n_clean"] == 2
+    text = card.render(pl, c, "over", opp="ARI")
+    assert "(avg 15.5; 12.0 without the 2 marked games)" in text
+    assert "Short history: 2 games without the marked ones." in text
+    assert "2 of his last 4 came with Lead Back out." in text
+    r = S.side_row(pl, c, "over", SHOWN, STUB, card.value(c, "needed_under"))
+    assert r["passes"], "12 still meets an ~11 bar: listed"
+    assert r["gap"] == pytest.approx(12.0 - card.shown_work(card.value(c, "needed_over")))
+    assert "lineup check: 2 of 4 marked" in r["flags"] and "short history" in r["flags"]
+    pl2, c2 = _card(50.5)                      # bar ~14: the 15.5 average meets it, the 12.0 does not
+    pl2.window, pl2.lineup = win, pl.lineup
+    r2 = S.side_row(pl2, c2, "over", SHOWN, STUB, card.value(c2, "needed_under"))
+    assert r2["lineup_out"] and not r2["passes"]
+    assert "his last-4 average is 15.5 but 12.0 without the 2 marked games" in r2["lineup_out"]
+    assert "Lead Back out" in r2["lineup_out"]
+
+
+def test_a_main_teammate_out_in_a_marked_game_is_named(monkeypatch):
+    from props.calc import player
+    last = pd.DataFrame({"season": [2026] * 4, "week": [1, 2, 3, 4], "game_id": ["g1", "g2", "g3", "g4"],
+                         "fewer_snaps": [False] * 4, "more_snaps": [False, True, True, False]})
+    ros = pd.DataFrame([{"season": 2026, "week": w, "team": "LA", "gsis_id": "00-0000002", "full_name": "Puka Nacua",
+                         "status": "ACT", "position": "WR"} for w in (1, 2, 3, 4, 5)])
+    share = pd.DataFrame({"game_id": ["g1", "g4"], "gsis_id": ["00-0000002"] * 2, "offense_pct": [0.9, 0.9]})
+    b = type("B", (), {"rosters": ros, "snap_share": share, "injury_report": lambda self, s: None})()
+    monkeypatch.setattr(player, "main_teammates", lambda *a: ["00-0000002"])
+    assert player.lineup_causes(b, last, "00-0000001", "LA", "WR", 2026, 5) == \
+        ["2 of his last 4 came with Puka Nacua out. Nacua is active."]
+    ir = ros.assign(status=["ACT", "ACT", "ACT", "ACT", "RES"])
+    b2 = type("B", (), {"rosters": ir, "snap_share": share.assign(game_id=["g2", "g3"]),
+                        "injury_report": lambda self, s: None})()
+    assert player.lineup_causes(b2, last, "00-0000001", "LA", "WR", 2026, 5) == \
+        ["2 of his last 4 came with Puka Nacua playing. Nacua is on injured reserve."]
