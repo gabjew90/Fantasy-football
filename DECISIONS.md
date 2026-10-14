@@ -9185,3 +9185,42 @@ the #245 freeze. One PR, no design change.
 - **Later ideas:** one pre-registered question for the week-8 rerun (QB or teammate changes inside a
   leg's last 4 games), its definition fixed before the data exists.
 
+## 2026-10-13 (247) -- the screen orders by the cushion in his swing; a lineup check on the last-4 average (the freeze lifted for these two)
+
+The user lifted the #245 freeze for these two changes, "to avoid making dumb bets" after the week-5
+Mumpfield leg; the freeze otherwise stands to 2026-11-02.
+
+- **The cushion is the gap over his swing (A).** The percent of the bar was wrong: one target of room on a
+  2.5 bar printed +40% (Mumpfield) while two targets on an 8 bar printed +28% (Shakir). The cushion is now
+  #244's candidate C as tested: the workload gap (his last-4 average minus the bar, in units, as the card
+  shows them) over his game-to-game swing, the standard deviation of his workload in the games his
+  longer-run rate uses (up to 16). Settled by the user: the swing is floored at 1 unit; under 4 such games
+  the cushion is n/a and the row sorts after every row with one. Ties as before (fewest ✗, most ✓). The
+  row and the card's Screen checks print the unit gap and the swing cushion ("+1 target, 0.3 of his
+  swing"); the percent is gone from the row, the Screen checks, ORDER, CHAT.md rule 8 and the screen's
+  docstring (the parlay-leg design note never carried it). Nothing is retuned or re-fit: the bar, the
+  rates and settings.yaml's values are unchanged. The test line still describes what was tested -- the
+  percent order (#244: top 3 a side -8.7 points against break-even) -- and says so; the live order is now
+  C, which #244 measured once on the same legs (top 3 a side: Overs -10.6, Unders -4.8; no better).
+- **A lineup check on the last-4 average (B), the user's second version (same day, before the merge).**
+  The first version marked a game by his own snap share (under half or over double his other games in
+  the window) as a proxy for a missing teammate; it missed the case it was built for (Mumpfield's 69% and
+  73% weeks with Puka Nacua out stayed under double his ~40%) and falsely marked Brian Robinson's growth
+  into a bigger role. It is replaced by a direct check:
+  (1) The low-snap star stays as it was before: under half his average in his other games THAT season;
+  a footnote only -- it does not remove a game from the second average. The "over double" rule is gone.
+  (2) A last-4 game is marked when a main teammate's status in it differs from today's: he took no
+  offensive snap in it and is active today, or he played in it and is Out or on injured reserve today.
+  Main teammates: the team's top 3 by targets this season among its WR and TE (for a WR or TE), its lead
+  carrier (for a back), and the starting QB -- the QB footnote's current starter: a game another QB
+  started is marked while the starter is active, and the games the starter played are marked when he is
+  Out or on IR today. Active today = not Out on the priced week's official report and not RES on his
+  latest roster listing; Questionable counts as active and is a flag on the screen row.
+  (3) The card names the cause: "2 of his last 4 came with Puka Nacua out. Nacua is active."; the reverse
+  "3 of his last 4 came with Breece Hall playing. Hall is Out."; for the QB, "... came with Lamar Jackson
+  at QB. Jackson is Out." (4) Unchanged: both averages on the card (the second "without the N games with
+  a lineup change"), the both-averages gate and "Not listed, lineup changed", short history under 3
+  remaining games, the cushion from the second average, and the week-8 pre-registration (the design
+  note's Later ideas). (5) settings.yaml's fewer_snaps_share comment now says the star is display only
+  (its value, 0.5, is unchanged).
+

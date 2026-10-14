@@ -153,7 +153,8 @@ def last_games(pl: Player, market: str, n: int) -> list[tuple]:
     """(workload, marked, row) for his last n games played, oldest first.
     Marked: far fewer snaps than usual, or a backup quarterback started."""
     col = workload_col(market)
-    return [(int(r[col]), bool(r.get("fewer_snaps", False)) or bool(r.get("backup_qb", False)), r)
+    return [(int(r[col]), bool(r.get("fewer_snaps", False)) or bool(r.get("backup_qb", False))
+             or bool(r.get("lineup_mark", False)), r)
             for _, r in pl.window.tail(n).iterrows()]
 
 
@@ -395,10 +396,25 @@ def _last_line(pl: Player, c: dict) -> tuple[list[str], list[tuple]]:
         out.append(f"Last {len(rows)}: {vals}")
         out.append(f"Short history: {len(rows)} games.")
     else:
-        out.append(f"Last {n}: {vals}  (avg {d1(c['usual'])})")
+        out.append(f"Last {n}: {vals}  (avg {d1(c['usual'])}{_without(rows)})")
+        kept = sum(1 for _, _, r in rows if not r.get("lineup_mark", False))
+        if kept < 3:
+            out.append(f"Short history: {kept} game{'' if kept == 1 else 's'} without a lineup change.")
     if c.get("usual_spans_seasons"):
         out.append(f"(Last {len(rows)} reach back into last season.)")
     return out, rows
+
+
+def _without(rows: list[tuple]) -> str:
+    """'; 2.0 without the 2 games with a lineup change' -- the lineup check's second average (DECISIONS
+    #247), or ''."""
+    clean = [w for w, _, r in rows if not r.get("lineup_mark", False)]
+    k = len(rows) - len(clean)
+    if not k:
+        return ""
+    if not clean:
+        return f"; every one of the {len(rows)} had a lineup change"
+    return f"; {d1(sum(clean) / len(clean))} without the {k} game{'s' if k > 1 else ''} with a lineup change"
 
 
 def _parts(pl: Player, c: dict, side: str) -> dict:
@@ -442,6 +458,14 @@ def _parts(pl: Player, c: dict, side: str) -> dict:
     # last-4 average as shown, then to the nearest half; the needed rate shown minus the recent rate shown
     work_ask = (shown_work(bar) - half_up(c["usual"], "0.1")) if bar is not None and c["usual"] is not None else None
     rate_ask = (shown_rate(need) - shown_rate(assumed)) if need is not None else None    # as displayed
+    # the lineup check (DECISIONS #247): the last-4 average without the games whose lineup differs from
+    # today's (a main teammate out then and active now, or playing then and Out now; the starting QB the
+    # same), and the ask against it. A low-snap star alone does not remove a game. Display and the screen only.
+    clean = [w for w, _, r in rows if not r.get("lineup_mark", False)] if c["usual"] is not None else []
+    marked = sum(1 for _, _, r in rows if r.get("lineup_mark", False)) if c["usual"] is not None else 0
+    usual_clean = (sum(clean) / len(clean)) if clean else None
+    work_ask_clean = ((shown_work(bar) - half_up(usual_clean, "0.1")) if bar is not None and usual_clean is not None
+                      else None)
     reached = None
     if bar is not None and len(rows) >= n:
         sb = shown_work(bar)
@@ -462,7 +486,8 @@ def _parts(pl: Player, c: dict, side: str) -> dict:
             "assumed": assumed, "assumed_text": f"{shown_rate(assumed):.1f} {rate_long}",
             "window": f"His longer-run rate ({len(win)} games{when})", "need": need, "need_text": need_text,
             "season_rate": season_rate, "work_ask": work_ask, "rate_ask": rate_ask, "reached": reached,
-            "split": split}
+            "split": split, "marked": marked, "n_clean": len(clean), "usual_clean": usual_clean,
+            "work_ask_clean": work_ask_clean}
 
 
 def render(pl: Player, c: dict, side: str, *, opp: str, game_lines: dict | None = None, why_no_lines: str = "",
@@ -497,6 +522,8 @@ def render(pl: Player, c: dict, side: str, *, opp: str, game_lines: dict | None 
     # "Calculation" follow-up; the row returns only as Sleeper's own workload line (step G)
     out += _no_depth(pl, m)
     out += _notes(rows, pl.season)
+    for x in pl.lineup:                                   # the lineup check's causes (DECISIONS #247)
+        out += _wrap(x)
     # AT ~U: the rate needed at his recent workload, the rate the bar assumes, his season rate, the opponent's
     if c["usual"] is not None:
         out += ["", f"AT {d1(c['usual'])} {many.upper()}"]
@@ -566,13 +593,16 @@ def render_md(pl: Player, c: dict, side: str, *, opp: str, game_lines: dict | No
     hist = []
     if rows:
         tabled = c["usual"] is not None and P["bar"] is not None
-        avg = f" (average {d1(c['usual'])})" if c["usual"] is not None and not tabled else ""
+        avg = (f" (average {d1(c['usual'])}{_without(rows)})" if c["usual"] is not None and not tabled
+               else (f" ({_without(rows)[2:]})" if c["usual"] is not None and P["marked"] else ""))
         hist.append(f"Last {len(rows)}: {_md_last(rows)}{avg}"
                     + (" (back into last season)" if c.get("usual_spans_seasons") else ""))
     else:
         hist.append(f"No games before week {pl.week}.")
     if 0 < len(rows) < P["n"]:
         hist.append(f"Short history: {len(rows)} games.")
+    elif c["usual"] is not None and P["n_clean"] < 3:
+        hist.append(f"Short history: {P['n_clean']} game{'' if P['n_clean'] == 1 else 's'} without a lineup change.")
     if P["bar"] is not None:
         if P["season"] is not None:
             n, hit, of = P["season"]
@@ -585,7 +615,7 @@ def render_md(pl: Player, c: dict, side: str, *, opp: str, game_lines: dict | No
     for x in hist:                             # a paragraph each: a copied reply keeps them apart
         out += [x, ""]
     out.pop()
-    notes = _md_notes(rows, pl.season) + [x for x in " ".join(_no_depth(pl, m)).split("\n") if x]
+    notes = _md_notes(rows, pl.season) + list(pl.lineup) + [x for x in " ".join(_no_depth(pl, m)).split("\n") if x]
     if notes:
         out += [""] + [f"* {x}" for x in notes]
     out.append("")
@@ -677,6 +707,8 @@ def render_not_enough(pl: Player, m: str, side: str, line: float | None, mult_ov
     out.append("Last games: " + (", ".join(f"{w}{'*' if mk else ''}" for w, mk, _ in rows) or "none")
                + f" ({many})")
     out += _notes(rows, pl.season)
+    for x in pl.lineup:
+        out += _wrap(x)
     if footer:
         out += [""] + _wrap(footer)
     return "\n".join(out)
@@ -691,7 +723,7 @@ def render_not_enough_md(pl: Player, m: str, side: str, line: float | None, mult
     out += ["", "Check first: not enough data, so no bar:"] + [f"- {why}" for why in pl.not_enough[m]]
     rows = last_games(pl, m, 4)
     out += ["", f"Last games ({many}): {_md_last(rows) or 'none'}"]
-    notes = _md_notes(rows, pl.season)
+    notes = _md_notes(rows, pl.season) + list(pl.lineup)
     if notes:
         out += [""] + [f"* {x}" for x in notes]
     if footer:

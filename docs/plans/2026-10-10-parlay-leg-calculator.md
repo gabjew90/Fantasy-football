@@ -384,6 +384,12 @@ Not built; each needs the user's go-ahead (the frozen-spec rule).
   - Rule: report only. A difference of 5 points or more with its range entirely on one side may
     become a flag on the card -- after the user's go-ahead and outside the freeze; anything less
     changes nothing.
+- **Also pre-registered for the week-8 rerun (the user, 2026-10-13; DECISIONS #247), before it runs:** the
+  hit rate of the legs the lineup check would have removed (listed by the last-4 average, not by the
+  average without its marked games) against the legs it kept, each against its own average break-even,
+  weeks 2-5 and weeks 6-8 reported separately, Overs and Unders separately and pooled, with #244's
+  ranges (2000 bootstrap resamples of games, seed 20261011). Report only; nothing changes on the result
+  without the user's go-ahead.
 
 ## Outputs
 

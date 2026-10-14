@@ -490,7 +490,7 @@ def screen(a) -> str:
     lookup = lines.LineLookup(b.rosters)
     inj = _display(lambda: _injuries(b, season))
     inj_ok = not isinstance(inj, dict)
-    rows, problems, ruled_out, n_posted = [], [], {}, 0
+    rows, problems, ruled_out, n_posted, lineup_out = [], [], {}, 0, []
     lines_out, sides_out = {}, {}                  # whole lines never built; sides built but not listed
     skip = lambda why: lines_out.__setitem__(why, lines_out.get(why, 0) + 1)      # noqa: E731
     unlisted = lambda why: sides_out.__setitem__(why, sides_out.get(why, 0) + 1)  # noqa: E731
@@ -532,7 +532,9 @@ def screen(a) -> str:
                 r = S.side_row(got["pl"], c, sd, got["shown"], got["stub"], bars["under" if sd == "over" else "over"])
                 if status:
                     r["flags"].insert(0, status)
-                if r["bar"] is None:
+                if r["lineup_out"]:                    # carried only by marked games (DECISIONS #247)
+                    lineup_out.append(f"{got['stub']['player']} {card.SHOW[p_['market']][0]} {sd}: {r['lineup_out']}")
+                elif r["bar"] is None:
                     unlisted("bar out of range")
                 elif c["usual"] is None:
                     unlisted("no recent average")
@@ -566,6 +568,8 @@ def screen(a) -> str:
     if ruled_out:
         L += ["", "Not listed, ruled Out: " + "; ".join(f"{n} ({', '.join(m)})" for n, m in sorted(ruled_out.items()))
               + "."]
+    if lineup_out:
+        L += ["", "Not listed, lineup changed:"] + [f"- {x}" for x in lineup_out]
     if sides_out:
         L += ["", "Sides not listed (an Over and an Under count separately): "
               + ", ".join(f"{n} {why}" for why, n in sorted(sides_out.items())) + "."]
