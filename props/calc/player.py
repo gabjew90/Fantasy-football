@@ -387,8 +387,11 @@ def lineup_marks(b: Bundle, last: pd.DataFrame, gsis: str, team: str, pos: str, 
 
     marks = [False] * n
     lines, flags = [], []
-    published = wk_rep is not None and "team" in wk_rep and bool((wk_rep["team"] == team).any())
-    if not published:                            # a Tuesday read is not a Sunday one (the user, 2026-10-13; DECISIONS #248)
+    # a Tuesday read is not a Sunday one (the user, 2026-10-13; DECISIONS #248). nflverse's report lists only
+    # injured players, so a team with a published report naming nobody also reads as not published.
+    if rep is None:
+        lines.append("Injury report not read: nobody counts as Out today.")
+    elif not ("team" in wk_rep and bool((wk_rep["team"] == team).any())):
         lines.append("Injury report not yet published: nobody counts as Out today.")
     for m in main_teammates(b, gsis, team, pos, season, week):
         gone = today(m)

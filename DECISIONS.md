@@ -9230,5 +9230,7 @@ The user, after #247: the lineup check reads "Out today" from the priced week's 
 before a team's report is out nobody counts as Out and a Tuesday read can look like a Sunday one. The
 screen's game header now says, per team, "Injury report not yet published: nobody counts as Out today."
 (it said "the week's injury report is not out yet."), and each card's lineup lines carry the same
-sentence when his team has no row on the week's report yet. No other change.
+sentence when his team has no row on the week's report yet ("Injury report not read" when the file
+cannot be read). nflverse's report lists only injured players, so a team whose published report names
+nobody also reads as not published. No other change.
 

@@ -516,3 +516,15 @@ def test_a_card_says_when_the_weeks_injury_report_is_not_published(monkeypatch):
                                                         "gsis_id": "y", "report_status": "Questionable"}])})()
     assert player.lineup_marks(out, LAST, "00-0000001", "LA", "WR", 2026, 5)[1] == []
 
+
+def test_an_unreadable_report_says_not_read(monkeypatch):
+    from props.calc import player
+    ros = pd.DataFrame([{"season": 2026, "week": 5, "team": "LA", "gsis_id": "00-0000002", "full_name": "X",
+                         "status": "ACT"}])
+    share = pd.DataFrame({"game_id": [], "gsis_id": [], "offense_pct": []})
+    monkeypatch.setattr(player, "main_teammates", lambda *a: [])
+    monkeypatch.setattr(player, "current_starter", lambda *a: None)
+    b = type("B", (), {"rosters": ros, "snap_share": share, "schedule": None, "injury_report": lambda self, s: None})()
+    assert player.lineup_marks(b, LAST, "00-0000001", "LA", "WR", 2026, 5)[1] == \
+        ["Injury report not read: nobody counts as Out today."]
+

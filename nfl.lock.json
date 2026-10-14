@@ -121,7 +121,7 @@
   "props/calc/names.py": "9eaa5617dd8d5ad2758ab529976928fb34b05d938b7eddbb7ab97fb5d555339c",
   "props/calc/odds.py": "e0096cc1f7b98e885268b8f01ac475260be75af3a5cc18485224b3e10a562c8f",
   "props/calc/opponent.py": "1a657b51f9b0463c8e6c9598a490ddd81e1270911a164777828b3c524a4b65f0",
-  "props/calc/player.py": "94ff67339934b796fe7be9456dacb15a547537b7fb4374b2333d4e86a7aa7fe9",
+  "props/calc/player.py": "d439976a5fe159d3fb812147bbb13f6ed8579545a18198c703e0ddfb64fba39f",
   "props/calc/rates.py": "0f29f11067e197df4375ffde997b0059757efd407a2e4bbdbcb8a0ea9793ed0f",
   "props/calc/screen.py": "ab786abb8dee146b0f2dfd421a0a9053f5190508ae2a931e8c4d9730e6e257b1",
   "props/calc/settings.py": "0e4dae8cd1a3be3ac6fc416d6a9048fa362d8427abb445f957c974da98a8ba3d",
@@ -206,6 +206,6 @@
   "scripts/bootstrap.py": "8c6c428d7b66fde19ea8894d5124a0c182ba3f9719db6031f4904459e3b8cdd7",
   "scripts/release.py": "0bdf24c73b040deb17c649e9d7badb9a71edaac6a6044f237be6e0e246ee804e"
  },
- "sha256": "9a1f4e147d37e98abad334c54e3f44f2f37d3e82a3f81077617b4bdf6ba78468",
+ "sha256": "e50321916792895c9a1091416b1987c8387b29cb80528d8a0021d8d49488f28c",
  "tag": "nfl-v1.84"
 }
