@@ -1,6 +1,6 @@
 # Props scorecard — 2026
 
-3563 calls (3746 priced lines graded, so 183 superseded by a later line).
+4074 calls (4461 priced lines graded, so 387 superseded by a later line).
 
 **11 pricing models in the record (props-v1.3, props-v1.26, props-v1.0, props-v1.1, props-v1.31, props-v1.25, props-v1.7, props-v1.18, props-v1.28, props-v1.55, props-v1.67); they are not pooled.** Pass `--pool` to pool them explicitly.
 
@@ -20,8 +20,8 @@ The research board shows no bet labels. The gate is decided only at the reviews 
 | props-v1.18 | 292 | 3-3 | not estimated below 300 calls | none yet (first after week 8) | — | — | closed |
 | props-v1.28 | 395 | 4-4 | +0.520 (-0.215, +1.143) | none yet (first after week 8) | — | — | closed |
 | props-v1.55 | 305 | 5-5 | -0.015 (-0.950, +1.223) | none yet (first after week 8) | — | — | closed |
-| props-v1.67 (current) | 386 | 5-5 | -0.285 (-1.288, +0.714) | none yet (first after week 8) | — | — | closed |
-| all models, pooled (context only) | 2721 | 2-5 | +0.049 (-0.299, +0.434) | none yet (first after week 8) | — | — | closed |
+| props-v1.67 (current) | 791 | 5-6 | -0.136 (-1.002, +0.545) | none yet (first after week 8) | — | — | closed |
+| all models, pooled (context only) | 3126 | 2-6 | +0.036 (-0.337, +0.377) | none yet (first after week 8) | — | — | closed |
 
 ## Sleeper against DraftKings/FanDuel
 
@@ -29,11 +29,11 @@ Not the model: when Sleeper's line or price sits off the DraftKings/FanDuel cons
 
 | Discrepancy | Bets | Won | Win rate | Break-even | Net per $100 (95% CI) |
 |---|---|---|---|---|---|
-| line off | 74 | 45 | 60.8% | 60.0% | +1.6 (-13.5, +13.6) |
+| line off | 91 | 58 | 63.7% | 61.0% | +4.4 (-8.9, +15.2) |
 | price off | 2 | 2 | 100.0% | 58.6% | +70.8 (+nan, +nan) |
-| both, pooled | 76 | 47 | 61.8% | 60.0% | +3.4 (-11.5, +15.5) |
+| both, pooled | 93 | 60 | 64.5% | 61.0% | +5.8 (-6.4, +18.6) |
 
-76 graded discrepancies: no verdict yet: the rule needs 200+ bets and an interval above zero.
+93 graded discrepancies: no verdict yet: the rule needs 200+ bets and an interval above zero.
 
 ## Engine props-v1.3
 
@@ -832,18 +832,18 @@ No out-of-sample check yet: it holds out one week at a time and needs at least t
 
 ## Engine props-v1.67
 
-495 settled calls, 244 winners (49.3%), net -4130 per $100 flat-staked.
+1006 settled calls, 507 winners (50.4%), net -6126 per $100 flat-staked.
 
 ### Calibration: does the model's probability mean anything?
 
 | Model prob | Calls | Hit rate | Stated | Diff | Net/$100 |
 |---|---|---|---|---|---|
-| 50%-55% | 127 | 57.5% | 52.4% | +5.1% | +373 |
-| 55%-60% | 102 | 56.9% | 57.3% | -0.5% | +17 |
-| 60%-65% | 75 | 52.0% | 62.2% | -10.2% | -693 |
-| 65%-70% | 37 | 37.8% | 67.0% | -29.1% | -1307 |
-| 70%-80% | 23 | 65.2% | 73.3% | -8.0% | +184 |
-| 80%-101% | 3 | 66.7% | 86.3% | -19.7% | +34 |
+| 50%-55% | 268 | 57.5% | 52.4% | +5.1% | +768 |
+| 55%-60% | 203 | 59.1% | 57.3% | +1.8% | +740 |
+| 60%-65% | 148 | 50.7% | 62.1% | -11.4% | -1911 |
+| 65%-70% | 79 | 46.8% | 67.0% | -20.2% | -1600 |
+| 70%-80% | 41 | 63.4% | 73.4% | -10.0% | +271 |
+| 80%-101% | 11 | 72.7% | 85.5% | -12.8% | +196 |
 
 A bucket needs roughly 50 calls before its hit rate says anything; below that the difference is noise.
 
@@ -851,11 +851,11 @@ A bucket needs roughly 50 calls before its hit rate says anything; below that th
 
 | Tier | Calls | Hit rate | Model said | Book said | Net/$100 |
 |---|---|---|---|---|---|
-| STRONG | 88 | 48.9% | 59.9% | 50.1% | -1094 |
-| MODERATE | 30 | 46.7% | 60.3% | 49.6% | -568 |
-| LEAN | 53 | 58.5% | 54.4% | 49.7% | +324 |
-| WEAK | 120 | 52.5% | 62.6% | 49.6% | -682 |
-| UNTIERED | 204 | 45.6% | 40.2% | 43.1% | -2110 |
+| STRONG | 165 | 55.8% | 59.8% | 50.2% | -87 |
+| MODERATE | 53 | 37.7% | 60.0% | 49.7% | -1758 |
+| LEAN | 114 | 52.6% | 54.4% | 49.8% | -614 |
+| WEAK | 250 | 55.2% | 62.9% | 49.7% | -311 |
+| UNTIERED | 424 | 46.5% | 41.1% | 43.7% | -3355 |
 
 WEAK exists on the assumption the book is right when it disagrees sharply. If WEAK hits nearer the model column than the book column, that assumption is costing money and the tier rule should change.
 
@@ -863,12 +863,12 @@ WEAK exists on the assumption the book is right when it disagrees sharply. If WE
 
 | Market | Calls | Hit rate | Model said | Net/$100 |
 |---|---|---|---|---|
-| player_anytime_td [anytime_td_v1] | 109 | 38.5% | 30.1% | -1299 |
-| player_pass_yds | 27 | 44.4% | 56.0% | -566 |
-| player_reception_yds | 137 | 49.6% | 57.4% | -1602 |
-| player_receptions | 140 | 52.1% | 58.7% | -1200 |
-| player_rush_reception_yds | 34 | 55.9% | 59.0% | -17 |
-| player_rush_yds | 48 | 62.5% | 58.6% | +553 |
+| player_anytime_td [anytime_td_v1] | 215 | 35.3% | 30.5% | -3361 |
+| player_pass_yds | 55 | 47.3% | 55.7% | -880 |
+| player_reception_yds | 283 | 53.7% | 57.6% | -1235 |
+| player_receptions | 288 | 55.2% | 58.7% | -892 |
+| player_rush_reception_yds | 71 | 53.5% | 58.1% | -329 |
+| player_rush_yds | 94 | 59.6% | 58.1% | +572 |
 
 Receptions and receiving yards are the only backtested markets; rushing and anytime TD have no backtest at all, so their rows here are the first evidence either way.
 
@@ -876,8 +876,8 @@ Receptions and receiving yards are the only backtested markets; rushing and anyt
 
 | Teammate Questionable at pricing | Calls | Hit rate | Model said | Net/$100 |
 |---|---|---|---|---|
-| yes | 229 | 48.9% | 51.9% | -2240 |
-| no | 266 | 49.6% | 51.9% | -1889 |
+| yes | 454 | 49.8% | 51.4% | -3043 |
+| no | 552 | 50.9% | 52.7% | -3083 |
 
 Those rows assume the teammate played. When he sat, they graded against a line priced on the wrong roster; if 'yes' runs apart from 'no', that is the cost.
 
@@ -886,10 +886,11 @@ Those rows assume the teammate played. When he sat, they graded against a line p
 | Week | Calls | Hit rate | Net/$100 |
 |---|---|---|---|
 | 5 | 495 | 49.3% | -4130 |
+| 6 | 511 | 51.5% | -1996 |
 
 ### Closing line value
 
-143 calls have both snapshots. The line moved toward the call 17.5% of the time (mean move -0.17).
+286 calls have both snapshots. The line moved toward the call 19.6% of the time (mean move -0.05).
 
 Beating the close consistently is the signal that survives small samples. Winning without it is variance.
 
@@ -899,28 +900,28 @@ Receiving calls whose target share the rule raised, lowered, or left alone. If t
 
 | Market | Rule | Calls | Hit rate | Model said | Book said | Mean miss |
 |---|---|---|---|---|---|---|
-| catches | raised | 83 | 57.8% | 58.8% | 50.7% | -0.45 |
-| catches | lowered | 41 | 48.8% | 58.9% | 49.1% | +0.50 |
-| catches | not moved | 16 | 31.2% | 57.8% | 47.7% | +0.39 |
-| receiving yards | raised | 82 | 50.0% | 56.7% | 50.0% | -6.20 |
-| receiving yards | lowered | 39 | 48.7% | 58.1% | 50.0% | +4.58 |
-| receiving yards | not moved | 16 | 50.0% | 59.2% | 49.9% | +0.69 |
+| catches | raised | 154 | 58.4% | 57.9% | 50.4% | -0.32 |
+| catches | lowered | 89 | 49.4% | 58.8% | 49.7% | +0.45 |
+| catches | not moved | 45 | 55.6% | 61.5% | 50.3% | +0.28 |
+| receiving yards | raised | 151 | 53.6% | 56.3% | 50.1% | -5.18 |
+| receiving yards | lowered | 87 | 51.7% | 58.1% | 50.0% | +4.02 |
+| receiving yards | not moved | 45 | 57.8% | 60.5% | 50.1% | +1.69 |
 
 A group needs about 50 calls before its numbers say anything.
 
 ## Round 39 reversal check: rushing yards with market carries vs without
 
-48 settled lines, 14 games. Board minus shadow, positive = the shadow is better:
-- Log loss: board 0.6986, shadow 0.7109; difference -0.0123 (95% CI -0.0306 to +0.0031)
-- Brier score: board 0.2521, shadow 0.2580; difference -0.0058 (95% CI -0.0148 to +0.0017)
+94 settled lines, 28 games. Board minus shadow, positive = the shadow is better:
+- Log loss: board 0.6998, shadow 0.7180; difference -0.0182 (95% CI -0.0345 to -0.0036)
+- Brier score: board 0.2528, shadow 0.2613; difference -0.0086 (95% CI -0.0164 to -0.0016)
 
 The board's number stays the price until a pre-set review says otherwise.
 
 ## Round 34 reversal check: receiving at target spread 60 vs 40
 
-277 settled lines, 14 games. Board minus shadow, positive = the shadow is better:
-- Log loss: board 0.7043, shadow 0.7035; difference +0.0008 (95% CI -0.0033 to +0.0050)
-- Brier score: board 0.2548, shadow 0.2545; difference +0.0004 (95% CI -0.0016 to +0.0023)
+571 settled lines, 28 games. Board minus shadow, positive = the shadow is better:
+- Log loss: board 0.6924, shadow 0.6918; difference +0.0005 (95% CI -0.0019 to +0.0032)
+- Brier score: board 0.2494, shadow 0.2492; difference +0.0002 (95% CI -0.0009 to +0.0015)
 
 The board's number stays the price until a pre-set review says otherwise.
 
@@ -930,17 +931,17 @@ No marked line has been graded yet.
 
 ### Market blend (shadow: nothing priced from it)
 
-109 settled anytime_td_v1 calls in this pricing model; the blend weight is not estimated below 300. The record is filling.
+215 settled anytime_td_v1 calls in this pricing model; the blend weight is not estimated below 300. The record is filling.
 
-386 settled yardage calls (receptions, receiving, rushing and QB passing yards); books sleeper (an intercept per book and per market; the intercept row below is sleeper's).
+791 settled yardage calls (receptions, receiving, rushing and QB passing yards); books sleeper (an intercept per book and per market; the intercept row below is sleeper's).
 
 | term | weight | 95% CI (game-clustered) |
 |---|---|---|
-| intercept | +0.033 | (-0.297, +0.346) |
-| logit(model) | -0.285 | (-1.288, +0.714) |
-| logit(market) | +2.353 | (+0.822, +4.239) |
+| intercept | -0.080 | (-0.615, +0.440) |
+| logit(model) | -0.136 | (-1.002, +0.545) |
+| logit(market) | +1.816 | (+0.543, +3.239) |
 
-No out-of-sample check yet: it holds out one week at a time and needs at least two (1 settled so far).
+Leave-one-week-out log loss on the same calls: model 0.6981, market 0.6868, blend 0.6879 (791 calls).
 
 ## Bet journal
 
