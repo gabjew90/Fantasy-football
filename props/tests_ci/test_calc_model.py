@@ -278,7 +278,8 @@ def stub_leg(monkeypatch, tmp_path):
         "kickoff_utc": "x", "favorite": "DAL", "points": 3.5, "spread_text": "DAL -3.5", "spread_unread": False,
         "total": 47.5}}, ""))
     monkeypatch.setattr(player, "Bundle", lambda *a, **k: type("B", (), {
-        "rosters": None, "schedule": None, "position_at": lambda self, *a: "RB"})())
+        "rosters": None, "schedule": None, "position_at": lambda self, *a: "RB",
+        "injury_report": lambda self, s: None})())   # no report read: no own-status note
     monkeypatch.setattr(player, "find_player", lambda *a, **k: ("00-1", "Test Back", "DAL"))
     monkeypatch.setattr(cli, "Manifest", lambda *a, **k: type("M", (), {"stale": lambda self: []})())
     monkeypatch.setattr(cli, "_next_game", lambda *a, **k: game)
@@ -311,6 +312,21 @@ def test_leg_not_enough_and_no_quote_shows_the_gap(stub_leg):
     pl.not_enough["rush_yds"] = ["12 of his own carries in his last 16 games (needs 30)"]
     text = cli.leg(_leg_args())
     assert "not enough data" in text and "Unmatched: no saved Sleeper quote" in text
+
+
+def test_a_ruled_out_player_is_said_on_the_not_enough_and_no_quote_cards(stub_leg, monkeypatch):
+    """DECISIONS #249: the cards that print no line note still say the player is ruled Out."""
+    cli, lookup, pl = stub_leg
+    from props.calc import player
+    rep = pd.DataFrame([{"season": 2026, "week": 5, "gsis_id": "00-1", "report_status": "Out"}])
+    monkeypatch.setattr(player, "Bundle", lambda *a, **k: type("B", (), {
+        "rosters": None, "schedule": None, "position_at": lambda self, *a: "RB",
+        "injury_report": lambda self, s: rep})())
+    note = "Check first: Test Back is ruled Out on this week's official injury report"
+    with pytest.raises(SystemExit, match="Check first: Test Back is ruled Out"):
+        cli.leg(_leg_args())                   # no quote: the Unmatched message carries it
+    pl.not_enough["rush_yds"] = ["12 of his own carries in his last 16 games (needs 30)"]
+    assert note in cli.leg(_leg_args()), "the not-enough card"
 
 
 def test_leg_reports_a_bad_saved_row_as_unmatched(stub_leg, monkeypatch):

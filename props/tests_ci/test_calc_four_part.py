@@ -241,6 +241,7 @@ def test_the_card_says_when_the_player_himself_is_on_the_report():
     assert CLI.own_status(b, "p2", 2026, 7) == "is listed Questionable on this week's official injury report"
     assert CLI.own_status(b, "p3", 2026, 7) == "", "last week's listing is not this week's"
     assert CLI.own_status(type("B", (), {"injury_report": lambda self, s: None})(), "p1", 2026, 7) == ""
+    assert CLI.report_status(rep, "p1", 7) == "Out" and CLI.report_status(rep, "p1", 6) is None
 
 
 def test_team_points_are_scored_and_allowed_a_game_from_either_side():

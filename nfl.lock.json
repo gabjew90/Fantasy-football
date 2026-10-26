@@ -105,7 +105,7 @@
   "nfl.py": "b42d1869b40de7b77d689a7127e6041eccbd25c2753944ac20f7eb380f9b52c8",
   "props/calc/CLAUDE.md": "c88a7571d7b84011e9783294f930e95b4aa13d69b8de1daf3816aada962c65c4",
   "props/calc/__init__.py": "0c1b2c80861038afe4a50ff8cfeab2e6112899707de9e83e92e42e49fee31fa7",
-  "props/calc/__main__.py": "3ed301ef39a9401faf324d805616f7db0615d9ddfd395b6724fc952af0a1b7f1",
+  "props/calc/__main__.py": "9799732ca7975e4e95eef8ffb5cdd34e11be6e78bf781ceeb7dcf1c57609a47d",
   "props/calc/calc.py": "9b9472bcf630bbfc6cb3b8a59dad2b5075e9183edc17bd9107feff697f315a9c",
   "props/calc/capture.py": "78323881ef032127ee7ce4ff20a8915ef539453215ed83246b6f03c6c3621950",
   "props/calc/card.py": "764a305aafaf25aa41c873f3511b5551b592bcfd99cf11ce94540cbc13d05ab3",
@@ -206,6 +206,6 @@
   "scripts/bootstrap.py": "8c6c428d7b66fde19ea8894d5124a0c182ba3f9719db6031f4904459e3b8cdd7",
   "scripts/release.py": "0bdf24c73b040deb17c649e9d7badb9a71edaac6a6044f237be6e0e246ee804e"
  },
- "sha256": "565fb44b898cd522d082cb9452cb48e9e3a8974cfaeda04e3b00661a821db156",
+ "sha256": "fc7915dec19b7e48cd2abad31cfdb36f439063281f8f7597c22c3a9c92d71e28",
  "tag": "nfl-v1.85"
 }

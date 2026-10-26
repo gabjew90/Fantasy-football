@@ -353,12 +353,15 @@ def build_card(b, name_in: str, market: str, side: str = "over", *, team=None, s
     # the chat card names where the quote came from (the user's layout: "quote source and capture time")
     md_footer = footer.replace("Line as of", "Sleeper line as of", 1) if at_utc is not None else footer
     md_warn = warn.strip() + "\n\n" if warn else ""
+    # the cards below print no line_note: his own listing goes above them as a warning
+    early = warn + (f"Check first: {name} {own}.\n" if own else "")
+    early_md = early.strip() + "\n\n" if early else ""
     if market in pl.not_enough:                 # the data gap is the first thing to say, line or not
-        nmd = md_warn + card.render_not_enough_md(pl, market, side, line, mo, mu, footer=md_footer)
-        return {**out, "text": warn + card.render_not_enough(pl, market, side, line, mo, mu, footer=footer),
+        nmd = early_md + card.render_not_enough_md(pl, market, side, line, mo, mu, footer=md_footer)
+        return {**out, "text": early + card.render_not_enough(pl, market, side, line, mo, mu, footer=footer),
                 "md": nmd, "md_game": nmd}
     if line is None:
-        return {**out, "text": warn + source, "md": md_warn + source, "md_game": md_warn + source}
+        return {**out, "text": early + source, "md": early_md + source, "md_game": early_md + source}
     model = player.model(pl, market, tuned, fixed)
     c = card.compute(pl, model, market, line, mo, mu, fixed, target)
     gl, why = _game_line(game, season, wk, kicked_off)
@@ -379,17 +382,22 @@ def build_card(b, name_in: str, market: str, side: str = "over", *, team=None, s
             "pooled_depths": list(pl.receiving.get("pooled_all_positions", []))}
 
 
+def report_status(rep, gsis: str, wk: int) -> str | None:
+    """His status on a season's official report for week wk: Out, Doubtful or Questionable, else None.
+    One reader for the screen (which leaves an Out player off its lists) and the card's warning."""
+    me = rep[(rep["week"] == wk) & (rep["gsis_id"] == gsis)]
+    st = str(me["report_status"].iloc[-1]) if len(me) else ""
+    return st if st in ("Questionable", "Doubtful", "Out") else None
+
+
 def own_status(b, gsis: str, season: int, wk: int) -> str:
     """'is ruled Out on this week's official injury report (Sleeper voids an Out player's leg)', or
-    'is listed Doubtful/Questionable on ...', or '' (not listed, or the report cannot be read)."""
-    try:
-        rep = b.injury_report(season)
-    except Exception:  # noqa: BLE001 -- display only
-        return ""
+    'is listed Doubtful/Questionable on ...', or '' (not listed, or the report file cannot be read --
+    Bundle.injury_report turns an unreadable file into None; a code error is not caught)."""
+    rep = b.injury_report(season)
     if rep is None or not len(rep):
         return ""
-    me = rep[(rep["season"] == season) & (rep["week"] == wk) & (rep["gsis_id"] == gsis)]
-    st = str(me["report_status"].iloc[-1]) if len(me) else ""
+    st = report_status(rep[rep["season"] == season], gsis, wk)
     if st == "Out":
         return "is ruled Out on this week's official injury report (Sleeper voids an Out player's leg)"
     if st in ("Doubtful", "Questionable"):
@@ -565,9 +573,7 @@ def screen(a) -> str:
             bars = {sd: card.value(c, f"needed_{sd}") for sd in ("over", "under")}
             status = None
             if inj_ok:
-                me = inj[(inj["week"] == wk) & (inj["gsis_id"] == got["stub"]["gsis_id"])]
-                st = str(me["report_status"].iloc[-1]) if len(me) else ""
-                status = st if st in ("Questionable", "Doubtful", "Out") else None
+                status = report_status(inj, got["stub"]["gsis_id"], wk)
             if status == "Out":             # Sleeper voids his leg: named below the tables, never ranked (DECISIONS #243)
                 ruled_out.setdefault(got["stub"]["player"], []).append(card.SHOW[p_["market"]][0])
                 continue
