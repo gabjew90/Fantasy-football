@@ -332,7 +332,7 @@ def matchup_lines(pl: Player, market: str, opp: str, lines_: dict | None, why_no
         out += _wrap(f"{pl.team} {kind} offense vs {opp} {kind} defense: "
                      + ((grades or {}).get("note") or "grades not available."))
     out += _wrap(spread_sentence(lines_, why_none))
-    for label, val in matchup_extra(pl.team, opp, lines_, grades_all, scoring):
+    for label, val in matchup_extra(pl.team, opp, lines_, grades_all, scoring, qb_today):
         out += _wrap(f"{label}: {val}")
     return out + (_wrap(qb_today) if qb_today else [])
 
@@ -342,11 +342,14 @@ def _grade_cell(gr: dict) -> str:
 
 
 def matchup_extra(team: str, opp: str, lines_: dict | None, grades_all: list | None,
-                  scoring: dict | None) -> list[tuple[str, str]]:
+                  scoring: dict | None, qb_today: str = "") -> list[tuple[str, str]]:
     """Part 3's rows beyond the grade line and the spread (DECISIONS #249): every unit pairing (both
     teams' run and pass offense against the other's defense), each team's implied points, and each
     team's points scored and allowed a game this season. grades_all: [(offense, defense, kind, grades)]."""
-    rows = [(f"{o} {k} offense vs {d} {k} defense", _grade_cell(g)) for o, d, k, g in (grades_all or [])]
+    out_qb = qb_today.removesuffix(" ruled Out.") if qb_today.endswith(" ruled Out.") else ""
+    rows = [(f"{o} {k} offense vs {d} {k} defense", _grade_cell(g)
+             + (f" (graded with {out_qb}, who is Out)" if out_qb and o == team and g.get("off") else ""))
+            for o, d, k, g in (grades_all or [])]
     imp = implied_totals(lines_, team, opp)
     if imp is not None:
         rows.append(("Implied points", f"{team} {d1(imp[team])}, {opp} {d1(imp[opp])}"))
@@ -386,18 +389,14 @@ RATE_HEAD = {"rush_yds": "Yds/carry", "receptions": "Catches/10 tgts", "rec_yds"
              "pass_yds": "Yds/comp"}
 
 
-def pct(p: float) -> str:
-    return f"{half_up(p * 100, '1'):.0f}%"
-
-
 def implied_totals(lines_: dict | None, team: str, opp: str) -> dict | None:
     """Each team's implied points from the total and the spread ({team: points}), or None when the game
     has no total, an unread spread, or a favorite that is neither team."""
     if not lines_ or lines_.get("total") is None or lines_.get("spread_unread"):
         return None
     t, fav = float(lines_["total"]), lines_.get("favorite")
-    if not fav:
-        return {team: t / 2, opp: t / 2}
+    if not fav:                                # an even spread splits the total; no spread at all says nothing
+        return {team: t / 2, opp: t / 2} if lines_.get("spread_text") else None
     if fav not in (team, opp):
         return None
     pts = float(lines_.get("points") or 0)
@@ -492,8 +491,9 @@ def line_part(pl: Player, c: dict, side: str) -> list[tuple[str, str]]:
     bet, (one, many) = SHOW[m][0], SHOW[m][1]
     po, pu = odds.fmt_american(price(c, "over")), odds.fmt_american(price(c, "under"))
     p = c["no_vig_over"]
-    rows = [("Line", f"{c['line']:g} {bet}: Over {po} / Under {pu}"),
-            ("The book's 50/50, margin removed", f"Over {pct(p)} / Under {pct(1 - p)} (the book's numbers)")]
+    over = half_up(p * 100, "1")                # the Under is the rest, so the two always add to 100
+    rows = [("Line", f"{c['line']:g} {bet}, Over {po} / Under {pu}"),
+            ("The book's 50/50, margin removed", f"Over {over:.0f}% / Under {100 - over:.0f}% (the book's numbers)")]
     b = value(c, "book_expects")
     rows.append(("Workload at the book's split (our math)",
                  f"{_work(b)} {many}" if b is not None else "not found in the calculator's range"))
@@ -570,6 +570,8 @@ def holds_up(pl: Player, c: dict, side: str, *, opp: str, game_lines: dict | Non
         if S["over"] * 2 != n:
             (low if S["over"] * 2 > n else high).append(f"He went over {line:g} in {_of(S, S['over'], n)}.")
         use, tag = (cl, f" {_without_special(S)}") if S["special_weeks"] and cl else (a, "")
+        if S["special_weeks"] and not cl:
+            tag = ", every game with something special"
         if S["special_weeks"] and cl and S["over_clean"] * 2 != cl["n"]:
             (low if S["over_clean"] * 2 > cl["n"] else high).append(
                 f"{_without_special(S)[0].upper() + _without_special(S)[1:]}, over {line:g} in {S['over_clean']} of {cl['n']}.")
@@ -606,10 +608,11 @@ def holds_up(pl: Player, c: dict, side: str, *, opp: str, game_lines: dict | Non
         if pts >= fixed_spread:
             fav = game_lines["favorite"] == pl.team
             who = f"{pl.team} is favored by {pts:g}" if fav else f"{pl.team} is a {pts:g}-point underdog"
+            general = "a general tendency, not his own history"
             if m == "rush_yds":
-                (low if fav else high).append(f"{who}: teams ahead tend to run more.")
+                (low if fav else high).append(f"{who}: teams ahead tend to run more ({general}).")
             else:
-                (high if fav else low).append(f"{who}: teams behind tend to throw more.")
+                (high if fav else low).append(f"{who}: teams behind tend to throw more ({general}).")
     return high, low
 
 
@@ -632,7 +635,8 @@ def matchup_md(pl: Player, market: str, opp: str, lines_: dict | None, why_none:
         out.append(f"| {pl.team} {kind} offense vs {opp} {kind} defense | "
                    f"{_cell((grades or {}).get('note') or 'grades not available.')} |")
     out.append(f"| Spread and total | {_cell(spread_sentence(lines_, why_none))} |")
-    out += [f"| {_cell(a)} | {_cell(b)} |" for a, b in matchup_extra(pl.team, opp, lines_, grades_all, scoring)]
+    out += [f"| {_cell(a)} | {_cell(b)} |" for a, b in matchup_extra(pl.team, opp, lines_, grades_all, scoring,
+                                                                       qb_today)]
     if qb_today:
         out.append(f"| Quarterback | {_cell(qb_today)} |")
     return out
@@ -792,7 +796,8 @@ def render(pl: Player, c: dict, side: str, *, opp: str, game_lines: dict | None 
     else:
         head, body = season_table(pl, c, S)
         for cells in body:
-            out += _wrap(f"Wk {cells[0]} {cells[1]}: {cells[2]} {many}, {cells[3]} {STAT_HEAD[m].lower()}, "
+            wk = f"Wk {cells[0]}" if cells[0].isdigit() else cells[0]
+            out += _wrap(f"{wk} {cells[1]}: {cells[2]} {many}, {cells[3]} {STAT_HEAD[m].lower()}, "
                          f"{cells[4]} {RATE_HEAD[m].lower()}, snaps {cells[5]}")
             if cells[6] != "-":
                 out += _wrap(f"  {cells[6]}")

@@ -42,6 +42,7 @@ def test_implied_points_from_the_total_and_the_spread():
     assert it({"favorite": "HOU", "points": 10.5, "total": 42.5}, "NYG", "HOU") == {"HOU": 26.5, "NYG": 16.0}
     assert it({"favorite": None, "spread_text": "EVEN", "total": 44.0}, "A", "B") == {"A": 22.0, "B": 22.0}
     assert it({"spread_unread": True, "total": 44.0}, "A", "B") is None
+    assert it({"favorite": None, "spread_text": None, "total": 44.0}, "A", "B") is None, "no spread is not even"
     assert it({"favorite": "KC", "points": 3, "total": 44.0}, "A", "B") is None, "a favorite that is neither team"
     assert it(None, "A", "B") is None and it({"favorite": "A", "points": 3}, "A", "B") is None
 
@@ -51,7 +52,7 @@ def test_part_one_prints_the_books_split_and_both_bars():
     rows = dict(card.line_part(pl, c, "over"))
     # -125 -> 55.6%, -132 -> 56.9%; margin removed: 55.6 / (55.6 + 56.9) = 49.4%
     assert rows["The book's 50/50, margin removed"] == "Over 49% / Under 51% (the book's numbers)"
-    assert rows["Line"] == "64.5 rushing yards: Over -125 / Under -132"
+    assert rows["Line"] == "64.5 rushing yards, Over -125 / Under -132"
     assert rows["Workload at the book's split (our math)"] == f"~{card._round(card.value(c, 'book_expects'))} carries"
     assert rows["His carries in his last 4 games"] == "15.5 a game; 15.5 without weeks 2 and 3"
     assert rows["Over 64.5"] == "1 of his last 4 games; 0 of 2 without weeks 2 and 3"
@@ -168,7 +169,7 @@ def test_part_four_sorts_the_facts_by_direction():
     assert "He averaged 51.5 rushing yards in his last 4 games without weeks 2 and 3, against a 64.5 line." in high
     assert low == ["Tampa Bay has allowed 4.4 yards a carry to RBs; his longer-run rate is 4.2.",
                    "DAL run offense B vs TB run defense C.", "DAL is implied 29.5 points; it has scored 27.3 a game.",
-                   "DAL is favored by 9.5: teams ahead tend to run more."]
+                   "DAL is favored by 9.5: teams ahead tend to run more (a general tendency, not his own history)."]
     # the same side either way: the facts are about the line, not a side
     assert card.holds_up(pl, c, "under", opp="TB", game_lines=GL, opp_row=OPP, grades=kw["grades"], qb_today="",
                          scoring=SCORING, fixed_spread=3.0) == (high, low)
@@ -184,7 +185,41 @@ def test_a_passing_card_reads_the_underdog_as_throwing_more():
     pl.perf = None
     high, low = card.holds_up(pl, c, "over", opp="TB", game_lines={**GL, "favorite": "TB"}, opp_row=None,
                               grades=None, qb_today="", scoring=None, fixed_spread=3.0)
-    assert low == ["DAL is a 9.5-point underdog: teams behind tend to throw more."] and high == []
+    assert low == ["DAL is a 9.5-point underdog: teams behind tend to throw more (a general tendency, "
+                   "not his own history)."] and high == []
+
+
+def test_the_books_split_always_adds_to_100():
+    pl, c, _ = _card()
+    c = {**c, "no_vig_over": 0.495}            # 49.5 rounds up to 50; the Under is the rest, not 50.5 -> 51
+    assert dict(card.line_part(pl, c, "over"))["The book's 50/50, margin removed"] == \
+        "Over 50% / Under 50% (the book's numbers)"
+
+
+def test_every_game_special_is_said_in_part_four():
+    pl, c, kw = _card()
+    pl.perf["reasons"] = [["X out"]] * 4
+    high, low = card.holds_up(pl, c, "over", opp="TB", game_lines=None, opp_row=None, grades=None, qb_today="",
+                              scoring=None, fixed_spread=3.0)
+    assert "He averaged 57.8 rushing yards in his last 4 games, every game with something special, against a 64.5 line." \
+        in high
+
+
+def test_a_grade_earned_with_an_out_quarterback_says_so_in_the_matchup_table():
+    rows = dict(card.matchup_extra("DAL", "TB", GL, GA, SCORING, "Dak Prescott ruled Out."))
+    assert rows["DAL pass offense vs TB pass defense"] == "A- vs B (graded with Dak Prescott, who is Out)"
+    assert rows["TB run offense vs DAL run defense"] == "D vs B+", "only his own team's offense"
+
+
+def test_team_points_are_scored_and_allowed_a_game_from_either_side():
+    from props.calc import __main__ as CLI
+    sch = pd.DataFrame([dict(season=2026, week=1, home_team="DAL", away_team="NYG", home_score=27.0, away_score=20.0),
+                        dict(season=2026, week=2, home_team="PHI", away_team="DAL", home_score=24.0, away_score=17.0),
+                        dict(season=2026, week=3, home_team="DAL", away_team="WAS", home_score=None, away_score=None),
+                        dict(season=2025, week=4, home_team="DAL", away_team="X", home_score=50.0, away_score=0.0)])
+    assert CLI.team_points(sch, "DAL", 2026, 4) == (22.0, 22.0, 2), "(27+17)/2 scored, (20+24)/2 allowed; week 3 unplayed"
+    assert CLI.team_points(sch, "PHI", 2026, 4) == (24.0, 17.0, 1)
+    assert CLI.team_points(sch, "DAL", 2026, 1) == (0.0, 0.0, 0)
 
 
 def test_both_cards_print_the_four_parts_and_the_same_numbers():

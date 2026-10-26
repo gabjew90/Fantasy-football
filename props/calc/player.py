@@ -530,7 +530,6 @@ def build(b: Bundle, gsis: str, name: str, team: str, season: int, week: int,
     mine = b.cut(b.games[b.games["gsis_id"] == gsis], season, week, "his games").sort_values(["season", "week"])
     mine = fewer_snaps(mine, b.snap_share, float(fixed["fewer_snaps_share"]))
     mine = backup_qb(mine, b.schedule, team, season, week, gsis)
-    mine = left_early(mine, b)
     window = mine.tail(int(fixed["rate_window_games"]))
     last_n = int(fixed["usual_games"])
     marks, causes, qflags = lineup_marks(b, window.tail(last_n), gsis, team, pos, season, week)
@@ -541,7 +540,7 @@ def build(b: Bundle, gsis: str, name: str, team: str, season: int, week: int,
     scope = "season" if len(this) >= int(fixed["season_read_min_games"]) else "recent"
     perf = this if scope == "season" else _results(b, mine.tail(last_n), margin)
     why_games, _, _ = lineup_detail(b, perf, gsis, team, pos, season, week, market)
-    perf = perf.assign(reasons=why_games)
+    perf = left_early(perf.assign(reasons=why_games), b)      # injury reports only for the games shown
     pools = b.pools(season, int(fixed["pool_seasons"]))
     pl = Player(gsis, name, team, pos, season, week, window, this, pools=pools, lineup=causes, lineup_flags=qflags,
                 perf=perf, perf_scope=scope)
