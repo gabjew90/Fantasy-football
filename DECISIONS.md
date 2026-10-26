@@ -9272,4 +9272,9 @@ without them, (3) the matchup -- implied totals, who is favored, run and pass un
   without-special-games averages, and his beat-the-line count; then "What needs to be true". The risks
   are written by chat from a required checklist in CHAT.md (teammate returning or out, the share going
   elsewhere, a quarterback change, game script, sample size, the market's test result).
+- **Found on the first live run (DAL at PHI, 2026-10-26):** every card now opens with the player's own
+  listing on the week's official report ("Check first: X is ruled Out ... (Sleeper voids an Out player's
+  leg)" / "is listed Questionable"); the screen already left Out players off its lists, but a game read
+  and a single leg said nothing (DeVonta Smith, Out, had cards). The game-script sentence follows its
+  direction (a favorite "throws less", an underdog "runs less").
 - The freeze otherwise stands to 2026-11-02.

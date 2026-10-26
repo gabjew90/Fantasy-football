@@ -170,6 +170,10 @@ def test_part_four_sorts_the_facts_by_direction():
     assert low == ["Tampa Bay has allowed 4.4 yards a carry to RBs; his longer-run rate is 4.2.",
                    "DAL run offense B vs TB run defense C.", "DAL is implied 29.5 points; it has scored 27.3 a game.",
                    "DAL is favored by 9.5: teams ahead tend to run more (a general tendency, not his own history)."]
+    dog_high, _ = card.holds_up(pl, c, "over", opp="TB", game_lines={**GL, "favorite": "TB"}, opp_row=None,
+                                grades=None, qb_today="", scoring=None, fixed_spread=3.0)
+    assert "DAL is a 9.5-point underdog: teams behind tend to run less (a general tendency, not his own history)." \
+        in dog_high
     # the same side either way: the facts are about the line, not a side
     assert card.holds_up(pl, c, "under", opp="TB", game_lines=GL, opp_row=OPP, grades=kw["grades"], qb_today="",
                          scoring=SCORING, fixed_spread=3.0) == (high, low)
@@ -209,6 +213,34 @@ def test_a_grade_earned_with_an_out_quarterback_says_so_in_the_matchup_table():
     rows = dict(card.matchup_extra("DAL", "TB", GL, GA, SCORING, "Dak Prescott ruled Out."))
     assert rows["DAL pass offense vs TB pass defense"] == "A- vs B (graded with Dak Prescott, who is Out)"
     assert rows["TB run offense vs DAL run defense"] == "D vs B+", "only his own team's offense"
+
+
+def test_a_favored_passing_card_says_teams_ahead_throw_less():
+    pl, c, _ = _card()
+    c = {**c, "market": "rec_yds"}
+    pl.perf = None
+    high, low = card.holds_up(pl, c, "over", opp="TB", game_lines=GL, opp_row=None, grades=None, qb_today="",
+                              scoring=None, fixed_spread=3.0)
+    assert high == ["DAL is favored by 9.5: teams ahead tend to throw less (a general tendency, not his own history)."]
+
+
+def test_one_season_game_is_singular():
+    pl, c, _ = _card()
+    S = {**card.season_read(pl, c), "n_season": 1}
+    assert card.season_lines(c, S)[-1] == "Only 1 game this season, so this is his last 4."
+
+
+def test_the_card_says_when_the_player_himself_is_on_the_report():
+    from props.calc import __main__ as CLI
+    rep = pd.DataFrame([{"season": 2026, "week": 7, "gsis_id": "p1", "report_status": "Out"},
+                        {"season": 2026, "week": 7, "gsis_id": "p2", "report_status": "Questionable"},
+                        {"season": 2026, "week": 6, "gsis_id": "p3", "report_status": "Out"}])
+    b = type("B", (), {"injury_report": lambda self, s: rep})()
+    assert CLI.own_status(b, "p1", 2026, 7) == \
+        "is ruled Out on this week's official injury report (Sleeper voids an Out player's leg)"
+    assert CLI.own_status(b, "p2", 2026, 7) == "is listed Questionable on this week's official injury report"
+    assert CLI.own_status(b, "p3", 2026, 7) == "", "last week's listing is not this week's"
+    assert CLI.own_status(type("B", (), {"injury_report": lambda self, s: None})(), "p1", 2026, 7) == ""
 
 
 def test_team_points_are_scored_and_allowed_a_game_from_either_side():

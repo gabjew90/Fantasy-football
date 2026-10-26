@@ -339,6 +339,11 @@ def build_card(b, name_in: str, market: str, side: str = "over", *, team=None, s
         except DataError as ex:                      # a bad saved row is reported; code errors are not caught
             source = f"Unmatched: {ex}; give --line --over --under"
     opp = game["away_team"] if game["home_team"] == team else game["home_team"]
+    # his own listing on the week's official report, first on the card (the screen already leaves an Out
+    # player off its lists; a game read or a single leg said nothing -- DECISIONS #249)
+    own = own_status(b, gsis, season, wk)
+    if own:
+        line_note = "; ".join(x for x in (line_note, f"{name} {own}") if x)
     footer = line_footer(at_utc) if line is not None else source      # no line: why not
     kicked_off = pd.Timestamp(game["kickoff_utc"]) <= pd.Timestamp(dt.datetime.now(dt.timezone.utc))
     out = {"by_initial": by_initial[0], "kicked_off": kicked_off, "stub": stub, "line": line, "mult_over": mo,
@@ -372,6 +377,24 @@ def build_card(b, name_in: str, market: str, side: str = "over", *, team=None, s
             "pl": pl, "shown": shown,                # the screen reads both sides from these (DECISIONS #240)
             # depths whose yards came from every position's catches (the "Calculation" follow-up; journal row)
             "pooled_depths": list(pl.receiving.get("pooled_all_positions", []))}
+
+
+def own_status(b, gsis: str, season: int, wk: int) -> str:
+    """'is ruled Out on this week's official injury report (Sleeper voids an Out player's leg)', or
+    'is listed Doubtful/Questionable on ...', or '' (not listed, or the report cannot be read)."""
+    try:
+        rep = b.injury_report(season)
+    except Exception:  # noqa: BLE001 -- display only
+        return ""
+    if rep is None or not len(rep):
+        return ""
+    me = rep[(rep["season"] == season) & (rep["week"] == wk) & (rep["gsis_id"] == gsis)]
+    st = str(me["report_status"].iloc[-1]) if len(me) else ""
+    if st == "Out":
+        return "is ruled Out on this week's official injury report (Sleeper voids an Out player's leg)"
+    if st in ("Doubtful", "Questionable"):
+        return f"is listed {st} on this week's official injury report"
+    return ""
 
 
 def unit_grades(b, team: str, opp: str, season: int, wk: int, fixed: dict) -> list:

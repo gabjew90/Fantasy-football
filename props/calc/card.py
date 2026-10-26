@@ -544,7 +544,8 @@ def season_lines(c: dict, S: dict) -> list[str]:
         out.append(f"Average {_without_special(S)} (the special games): {avg(S['clean'])}." if S["clean"]
                    else "Every game had something special; no second average.")
     if S["scope"] != "season":
-        out.append(f"Only {S['n_season']} games this season, so this is his last {S['all']['n']}"
+        k = S["n_season"]
+        out.append(f"Only {k} game{'' if k == 1 else 's'} this season, so this is his last {S['all']['n']}"
                    + (", back into last season." if S["spans_seasons"] else "."))
     return out
 
@@ -610,9 +611,11 @@ def holds_up(pl: Player, c: dict, side: str, *, opp: str, game_lines: dict | Non
             who = f"{pl.team} is favored by {pts:g}" if fav else f"{pl.team} is a {pts:g}-point underdog"
             general = "a general tendency, not his own history"
             if m == "rush_yds":
-                (low if fav else high).append(f"{who}: teams ahead tend to run more ({general}).")
+                why = "teams ahead tend to run more" if fav else "teams behind tend to run less"
+                (low if fav else high).append(f"{who}: {why} ({general}).")
             else:
-                (high if fav else low).append(f"{who}: teams behind tend to throw more ({general}).")
+                why = "teams ahead tend to throw less" if fav else "teams behind tend to throw more"
+                (high if fav else low).append(f"{who}: {why} ({general}).")
     return high, low
 
 
