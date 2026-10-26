@@ -137,9 +137,10 @@ def test_card_renders_the_spec_layout():
                    "This season: ", "Tampa Bay allows: 4.4 yards a carry to RBs (4 games)", "MATCHUP", "DAL run offense B vs TB run defense C",
                    "Dallas favored by 9.5. Total 49.5.", "Line as of Oct 8, 4:59 PM PT."):
         assert needle in flat, needle
-    for gone in ("Under", "Gap", "Book expects", "%", "wins often enough", "Bar assumes", "Line implies",
-                 "our math"):
-        assert gone not in text, gone                       # one side, no gap line, no percentages
+    for gone in ("Gap", "Book expects", "wins often enough", "Bar assumes", "Line implies"):
+        assert gone not in text, gone                       # no gap line, no chance of its own
+    # DECISIONS #249: the book's split is on the card, as the book's numbers, beside both prices
+    assert "Over 49% / Under 51% (the book's numbers)" in flat and "Under needs at its price (-132)" in flat
     import re
     for banned in ("bet", "value", "edge", "lean", "pick", "recommend", "play this", "lock"):
         assert not re.search(rf"\b{banned}\b", text.lower()), banned

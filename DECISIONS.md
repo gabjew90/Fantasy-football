@@ -9234,3 +9234,42 @@ sentence when his team has no row on the week's report yet ("Injury report not r
 cannot be read). nflverse's report lists only injured players, so a team whose published report names
 nobody also reads as not published. No other change.
 
+
+## 2026-10-26 (249) -- the four-part leg read on the cards (the freeze lifted for it)
+
+The user lifted the #245 freeze ("lift the freeze") for the four-part read they specified: every leg card
+answers, in order, (1) where the line is and where the book puts 50/50, (2) how he has done this season in
+volume and efficiency, what special circumstances touched those games, and what the games look like
+without them, (3) the matchup -- implied totals, who is favored, run and pass units on both sides -- and
+(4) what the line expects against his history, whether the matchup supports it, and the risks.
+
+- **Part 1, the line.** Both sides' prices, the book's split with the margin removed (odds.no_vig;
+  labelled as the book's numbers, not a chance of ours), the workload that split implies under the
+  calculator's model (labelled our math), and both sides' bars. This reverses the 2026-10-10 rule that
+  kept "Line implies (our math)" and percentages off the default card: the user now asks for the book's
+  50/50 on every card.
+- **Part 2, this season.** The user: "if we have more than 4 games worth of data this season, just use
+  it." With more than 4 games this season (settings.yaml season_read_min_games: 5) the card prints every
+  game this season -- week, opponent, workload, stat, rate, snap share, and what was special about it --
+  with averages, the averages without the special games, and how often he beat the line and reached the
+  bar. With 4 or fewer it prints his last 4 games (back into last season) and says so. Special games:
+  left early (far fewer snaps AND listed Out, Doubtful or Questionable, or on injured reserve, for his
+  team's next game -- the boards' rule; a low-snap game with no listing is a role change and stays in);
+  a lineup change (the #247 check, per game with its reason; for a back's catches and receiving yards it
+  also counts the team's top 3 receivers); another quarterback started.
+- **Scope kept narrow, on purpose.** This is display: the bar, the pricing model's rate window, the
+  last-4 average and its asks, the screen's gate, cushion and order are unchanged -- the screen-order
+  rerun (#244) is pre-registered on them. Changing the model to season-only rates would need its own
+  measured test.
+- **Fix, a quarterback's own card:** backup_qb no longer marks the games a quarterback started himself
+  (a starter returning from injury had his own starts marked because another quarterback started the most
+  recent game). This one fix also reaches the screen: on such a quarterback's own passing card his own
+  starts no longer count as lineup changes in the last-4 check. A wrong number, so it is fixed now; it
+  touches only quarterback cards whose player did not start his team's most recent game.
+- **Part 3, matchup.** The chat card's matchup table prints both run and pass units for both teams, the
+  implied team totals (total and spread), and each team's points a game this season.
+- **Part 4, book vs history.** Facts only: the workload at the book's split against his season and
+  without-special-games averages, and his beat-the-line count; then "What needs to be true". The risks
+  are written by chat from a required checklist in CHAT.md (teammate returning or out, the share going
+  elsewhere, a quarterback change, game script, sample size, the market's test result).
+- The freeze otherwise stands to 2026-11-02.

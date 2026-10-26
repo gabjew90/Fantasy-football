@@ -46,15 +46,22 @@ def test_the_chat_card_follows_the_users_layout():
     assert "| His longer-run rate (5 games) | 4.2 yards a carry |" in L
     assert "| Opponent has allowed | 4.4 yards a carry to RBs |" in L
     assert "Opponent figure: 4 games, garbage time left out." in md
-    i = L.index("**Matchup**")
+    i = L.index("**3 · Matchup**")
     assert L[i + 2:i + 7] == ["| Matchup | This game |", "|---|---|", "| DAL run offense | B |",
                               "| TB run defense | C |", "| Spread and total | Dallas favored by 9.5. Total 49.5. |"]
     assert any(x.startswith("What needs to be true: ") for x in L) and "?" not in md
     assert L[-1] == "_Line as of Oct 8, 4:59 PM PT._"
-    assert "```" not in md and "~" not in md.replace(f"~{bar}", "")
+    # "~" only on workloads: the bar, the other side's bar and the workload at the book's split
+    book, under = card._round(card.value(c, "book_expects")), card._round(card.value(c, "needed_under"))
+    assert "```" not in md and "~" not in md.replace(f"~{bar}", "").replace(f"~{book}", "").replace(f"~{under}", "")
     # bold only on what the bet needs: the bar (heading and cell) and the needed rate
     bolds = re.findall(r"\*\*(.+?)\*\*", md)
-    assert bolds[0] == "Test Back · Rushing yards" and len(bolds) == 6 and "Matchup" in bolds, bolds
+    assert bolds[0] == "Test Back · Rushing yards" and "3 · Matchup" in bolds, bolds
+    # the four parts in order (DECISIONS #249)
+    heads = [L.index(x) for x in ("**1 · The line**", "**2 · This season**", "**3 · Matchup**",
+                                  "**4 · Does it hold up**")]
+    assert heads == sorted(heads)
+    assert len(bolds) == 9, bolds
 
 
 def test_every_number_on_the_chat_card_is_on_the_text_card():
@@ -301,5 +308,6 @@ def test_the_chat_matchup_table_carries_the_qb_line_and_the_no_grades_note():
 def test_a_screen_or_game_card_leaves_the_matchup_to_the_game_header():
     pl, c, text, md = _rush()
     short = card.render_md(pl, c, "over", matchup=False, **KW)
-    assert "**Matchup**" in md and "**Matchup**" not in short and "Dallas favored" not in short
+    assert "**3 · Matchup**" in md and "**3 · Matchup**" not in short and "Dallas favored" not in short
+    assert "Part 3, the matchup, is in the game header above." in short
     assert short.replace("\n\n", "\n").count("What needs to be true") == 1

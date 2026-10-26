@@ -361,7 +361,9 @@ def build_card(b, name_in: str, market: str, side: str = "over", *, team=None, s
                  opp_row=_display(lambda: _opp_allows(b, market, opp, pl.position, season, wk, fixed)),
                  grades=_display(lambda: matchup.grade_pair(b, team, opp, "run" if market == "rush_yds"
                                                              else "pass", season, wk, fixed)),
-                 qb_today=_display_text(lambda: qb_today(b, team, season, wk)))
+                 qb_today=_display_text(lambda: qb_today(b, team, season, wk)),
+                 grades_all=unit_grades(b, team, opp, season, wk, fixed),
+                 scoring=_display(lambda: {t: team_points(b.schedule, t, season, wk) for t in (team, opp)}))
     text = card.render(pl, c, side, footer=footer, **shown)
     md = card.render_md(pl, c, side, footer=md_footer, **shown)
     md_game = card.render_md(pl, c, side, footer=md_footer, matchup=False, **shown)
@@ -370,6 +372,24 @@ def build_card(b, name_in: str, market: str, side: str = "over", *, team=None, s
             "pl": pl, "shown": shown,                # the screen reads both sides from these (DECISIONS #240)
             # depths whose yards came from every position's catches (the "Calculation" follow-up; journal row)
             "pooled_depths": list(pl.receiving.get("pooled_all_positions", []))}
+
+
+def unit_grades(b, team: str, opp: str, season: int, wk: int, fixed: dict) -> list:
+    """Part 3's unit pairings (DECISIONS #249): both teams' run and pass offense against the other's
+    defense, [(offense, defense, kind, grades)]; a pairing that cannot be read carries its note."""
+    return [(o, d, k, _display(lambda o=o, d=d, k=k: matchup.grade_pair(b, o, d, k, season, wk, fixed)))
+            for o, d in ((team, opp), (opp, team)) for k in ("run", "pass")]
+
+
+def team_points(schedule, team: str, season: int, wk: int) -> tuple:
+    """(points scored a game, allowed a game, games) in the team's played games this season before wk."""
+    t = player.played_before(schedule, team, season, wk)
+    if t.empty:
+        return (0.0, 0.0, 0)
+    home = t["home_team"] == team
+    pf = t["home_score"].where(home, t["away_score"])
+    pa = t["away_score"].where(home, t["home_score"])
+    return (float(pf.mean()), float(pa.mean()), len(t))
 
 
 def _md_lead(warn: str) -> str:

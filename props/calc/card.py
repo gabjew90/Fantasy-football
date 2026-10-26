@@ -11,7 +11,9 @@ import re
 import textwrap
 
 from . import calc, odds
-from .markets import min_own, workload_col
+import pandas as pd
+
+from .markets import min_own, stat_col, workload_col
 from .names import TEAM_NAMES
 from .player import Player
 
@@ -46,6 +48,7 @@ def compute(pl: Player, model: calc.Model, market: str, line: float, mult_over: 
         "solutions": {"needed_over": s_o, "needed_under": s_u, "book_expects": s_b,
                       "rate_needed_over": r_o, "rate_needed_under": r_u},
         "usual": usual, "rate": model.rate, "search_max": model.limits.search_max[model.kind],
+        "script_spread": float(fixed["script_spread"]),
     }
     need_o, need_u = value(out, "needed_over"), value(out, "needed_under")
     recent = pl.window.tail(int(fixed["usual_games"]))
@@ -311,13 +314,16 @@ def grade_line(pl: Player, market: str, opp: str, grades: dict) -> str:
 
 
 def matchup_lines(pl: Player, market: str, opp: str, lines_: dict | None, why_none: str = "",
-                  grades: dict | None = None, qb_today: str = "") -> list[str]:
+                  grades: dict | None = None, qb_today: str = "", grades_all: list | None = None,
+                  scoring: dict | None = None) -> list[str]:
     """MATCHUP: the grade line (run for rushing cards, pass for the others)
     and the spread and total -- ESPN's, else the nflverse schedule's closing
     line, labelled. Display only. grades: {"off", "def"} grades such as "A-", or {"note"}."""
     kind = "run" if market == "rush_yds" else "pass"
-    out = ["MATCHUP"]
-    if grades and grades.get("off") and grades.get("def"):
+    out = ["3 MATCHUP"]
+    if grades_all:
+        pass                                   # every pairing is printed below (matchup_extra)
+    elif grades and grades.get("off") and grades.get("def"):
         line = grade_line(pl, market, opp, grades)
         # too wide: break at "vs", so each grade stays beside its unit
         out += [line] if len(line) <= WIDTH else [f"{pl.team} {kind} offense {grades['off']} vs",
@@ -326,7 +332,29 @@ def matchup_lines(pl: Player, market: str, opp: str, lines_: dict | None, why_no
         out += _wrap(f"{pl.team} {kind} offense vs {opp} {kind} defense: "
                      + ((grades or {}).get("note") or "grades not available."))
     out += _wrap(spread_sentence(lines_, why_none))
+    for label, val in matchup_extra(pl.team, opp, lines_, grades_all, scoring):
+        out += _wrap(f"{label}: {val}")
     return out + (_wrap(qb_today) if qb_today else [])
+
+
+def _grade_cell(gr: dict) -> str:
+    return f"{gr['off']} vs {gr['def']}" if gr.get("off") and gr.get("def") else (gr.get("note") or "not available")
+
+
+def matchup_extra(team: str, opp: str, lines_: dict | None, grades_all: list | None,
+                  scoring: dict | None) -> list[tuple[str, str]]:
+    """Part 3's rows beyond the grade line and the spread (DECISIONS #249): every unit pairing (both
+    teams' run and pass offense against the other's defense), each team's implied points, and each
+    team's points scored and allowed a game this season. grades_all: [(offense, defense, kind, grades)]."""
+    rows = [(f"{o} {k} offense vs {d} {k} defense", _grade_cell(g)) for o, d, k, g in (grades_all or [])]
+    imp = implied_totals(lines_, team, opp)
+    if imp is not None:
+        rows.append(("Implied points", f"{team} {d1(imp[team])}, {opp} {d1(imp[opp])}"))
+    for t in (team, opp):
+        sc = (scoring or {}).get(t)
+        if sc is not None and sc[2]:
+            rows.append((f"{t} this season", team_points_text(t, sc)))
+    return rows
 
 
 def spread_sentence(lines_: dict | None, why_none: str = "") -> str:
@@ -348,18 +376,263 @@ def spread_sentence(lines_: dict | None, why_none: str = "") -> str:
     return "Spread and total: none on ESPN (removed once a game is final)."
 
 
+# ---- the four-part read (the user's spec, 2026-10-26; DECISIONS #249) ----
+# 1 the line and where the book puts 50/50, against his history; 2 this season (or his last games), with
+# the special games named and left out of a second average; 3 the matchup; 4 does it hold up: the facts
+# of 1-3 sorted by whether they point to the line being set high or low. Facts only: no chance, no verdict.
+
+STAT_HEAD = {"rush_yds": "Rush yds", "receptions": "Catches", "rec_yds": "Rec yds", "pass_yds": "Pass yds"}
+RATE_HEAD = {"rush_yds": "Yds/carry", "receptions": "Catches/10 tgts", "rec_yds": "Yds/target",
+             "pass_yds": "Yds/comp"}
+
+
+def pct(p: float) -> str:
+    return f"{half_up(p * 100, '1'):.0f}%"
+
+
+def implied_totals(lines_: dict | None, team: str, opp: str) -> dict | None:
+    """Each team's implied points from the total and the spread ({team: points}), or None when the game
+    has no total, an unread spread, or a favorite that is neither team."""
+    if not lines_ or lines_.get("total") is None or lines_.get("spread_unread"):
+        return None
+    t, fav = float(lines_["total"]), lines_.get("favorite")
+    if not fav:
+        return {team: t / 2, opp: t / 2}
+    if fav not in (team, opp):
+        return None
+    pts = float(lines_.get("points") or 0)
+    dog = opp if fav == team else team
+    return {fav: (t + pts) / 2, dog: (t - pts) / 2}
+
+
+def _agg(rows: list[dict], k: float) -> dict | None:
+    if not rows:
+        return None
+    work = sum(r["work"] for r in rows)
+    stat = sum(r["stat"] for r in rows)
+    return {"n": len(rows), "work": work / len(rows), "stat": stat / len(rows),
+            "rate": (stat / work * k) if work else None}
+
+
+def season_read(pl: Player, c: dict) -> dict | None:
+    """Part 2's numbers: one row per game of pl.perf (this season's games, or his last games when this
+    season has too few) with what was special about it, the averages with and without the special games,
+    and how often he went over and under the line. Special: left early (fewer snaps and listed for the
+    next game), a lineup change (lineup_detail's reasons), or -- on a quarterback's card -- a game he did
+    not start. None with no games."""
+    g = pl.perf
+    if g is None or not len(g):
+        return None
+    m = c["market"]
+    wcol, scol, k = workload_col(m), stat_col(m), SHOW[m][3]
+    rows = []
+    for _, r in g.iterrows():
+        notes = list(r.get("reasons") or [])
+        if bool(r.get("left_early", False)):
+            notes.insert(0, f"left early ({r.get('hurt_next')} next game)")
+        q = r.get("qb_id")
+        if pl.position == "QB" and isinstance(q, str) and q and q != pl.gsis_id:
+            notes.append("did not start")
+        special = bool(notes)
+        if bool(r.get("fewer_snaps", False)) and not bool(r.get("left_early", False)):
+            notes.append("far fewer snaps, no injury listing")
+        snap = r.get("snap_pct")
+        rows.append({"season": int(r["season"]), "week": int(r["week"]), "opp": r.get("opp") or "",
+                     "work": int(r[wcol]), "stat": float(r[scol]),
+                     "snap": float(snap) if snap is not None and pd.notna(snap) else None,
+                     "notes": notes, "special": special})
+    clean = [r for r in rows if not r["special"]]
+    line = c["line"]
+    return {"scope": pl.perf_scope, "rows": rows, "all": _agg(rows, k), "clean": _agg(clean, k),
+            "special_weeks": [_wk(r, pl.season) for r in rows if r["special"]],
+            "over": sum(r["stat"] > line for r in rows), "under": sum(r["stat"] < line for r in rows),
+            "over_clean": sum(r["stat"] > line for r in clean), "under_clean": sum(r["stat"] < line for r in clean),
+            "spans_seasons": any(r["season"] != pl.season for r in rows), "n_season": len(pl.season_games)}
+
+
+def _wk(r: dict, season: int) -> str:
+    return f"week {r['week']}" if r["season"] == season else f"{r['season']} week {r['week']}"
+
+
+def _scope(S: dict) -> str:
+    return "this season" if S["scope"] == "season" else f"in his last {S['all']['n']} games"
+
+
+def _weeks(ws: list[str]) -> str:
+    """["week 2", "week 3"] -> "weeks 2 and 3"; a week from another season keeps its year."""
+    if all(w.startswith("week ") for w in ws):
+        nums = [w[5:] for w in ws]
+        return f"week {nums[0]}" if len(nums) == 1 else f"weeks {', '.join(nums[:-1])} and {nums[-1]}"
+    return ws[0] if len(ws) == 1 else f"{', '.join(ws[:-1])} and {ws[-1]}"
+
+
+def _without_special(S: dict) -> str:
+    return f"without {_weeks(S['special_weeks'])}"
+
+
+def _of(S: dict, x: int, n: int) -> str:
+    """'3 of 6 games this season' or '1 of his last 4 games'."""
+    return f"{x} of {n} games this season" if S["scope"] == "season" else f"{x} of his last {n} games"
+
+
+def _bar_cell(c: dict, side: str) -> str:
+    s = c["solutions"][f"needed_{side}"]
+    res = calc.side_result(side, s.status)
+    many = SHOW[c["market"]][1][1]
+    if res == "ok":
+        return f"{_work(s.value)} {many}" + (" or fewer" if side == "under" else "")
+    return f"{'any' if res == 'always' else 'no'} workload up to {c['search_max']:.0f} {many} clears it"
+
+
+def line_part(pl: Player, c: dict, side: str) -> list[tuple[str, str]]:
+    """Part 1 as (label, value) rows, shared by both cards: the line and both prices, the book's split
+    with the margin removed (the book's numbers), the workload that split implies (our math), his
+    workload and how often he went over or under the line, and the other side's bar."""
+    m = c["market"]
+    bet, (one, many) = SHOW[m][0], SHOW[m][1]
+    po, pu = odds.fmt_american(price(c, "over")), odds.fmt_american(price(c, "under"))
+    p = c["no_vig_over"]
+    rows = [("Line", f"{c['line']:g} {bet}: Over {po} / Under {pu}"),
+            ("The book's 50/50, margin removed", f"Over {pct(p)} / Under {pct(1 - p)} (the book's numbers)")]
+    b = value(c, "book_expects")
+    rows.append(("Workload at the book's split (our math)",
+                 f"{_work(b)} {many}" if b is not None else "not found in the calculator's range"))
+    S = season_read(pl, c)
+    if S is not None:
+        a, cl = S["all"], S["clean"]
+        work = f"{d1(a['work'])} a game"
+        if S["special_weeks"]:
+            work += f"; {d1(cl['work'])} {_without_special(S)}" if cl else "; every game was special"
+        rows.append((f"His {many} {_scope(S)}", work))
+        word = "Over" if side == "over" else "Under"
+        x, xc = S[side], S[f"{side}_clean"]
+        beat = _of(S, x, a["n"])
+        if S["special_weeks"] and cl:
+            beat += f"; {xc} of {cl['n']} {_without_special(S)}"
+        rows.append((f"{word} {c['line']:g}", beat))
+    other = "under" if side == "over" else "over"
+    rows.append((f"{other.title()} needs at its price ({odds.fmt_american(price(c, other))})", _bar_cell(c, other)))
+    return rows
+
+
+def season_table(pl: Player, c: dict, S: dict) -> tuple[list[str], list[list[str]]]:
+    """Part 2's table: header and one row of cells per game, shared by both cards."""
+    m = c["market"]
+    k = SHOW[m][3]
+    head = ["Week", "Opp", SHOW[m][1][1].title(), STAT_HEAD[m], RATE_HEAD[m], "Snaps", "Note"]
+    body = []
+    for r in S["rows"]:
+        wk = str(r["week"]) if r["season"] == pl.season else f"{r['season']} wk {r['week']}"
+        rate = d1(r["stat"] / r["work"] * k) if r["work"] else "-"
+        snap = f"{half_up(r['snap'] * 100, '1'):.0f}%" if r["snap"] is not None else "-"
+        note = "; ".join(r["notes"]) or "-"
+        body.append([wk, r["opp"] or "-", str(r["work"]), _num(r["stat"]), rate, snap,
+                     ("SPECIAL: " if r["special"] else "") + note])
+    return head, body
+
+
+def season_lines(c: dict, S: dict) -> list[str]:
+    """Part 2's averages, with and without the special games."""
+    m = c["market"]
+    bet, many, unit = SHOW[m][0], SHOW[m][1][1], SHOW[m][2]
+
+    def avg(a):
+        rate = f", {d1(a['rate'])} {unit}" if a["rate"] is not None else ""
+        return f"{d1(a['work'])} {many}, {d1(a['stat'])} {bet}{rate} ({a['n']} games)"
+    out = [f"Average {_scope(S)}: {avg(S['all'])}."]
+    if S["special_weeks"]:
+        out.append(f"Average {_without_special(S)} (the special games): {avg(S['clean'])}." if S["clean"]
+                   else "Every game had something special; no second average.")
+    if S["scope"] != "season":
+        out.append(f"Only {S['n_season']} games this season, so this is his last {S['all']['n']}"
+                   + (", back into last season." if S["spans_seasons"] else "."))
+    return out
+
+
+def team_points_text(team: str, sc) -> str:
+    pf, pa, n = sc
+    return f"{d1(pf)} scored, {d1(pa)} allowed a game ({n} games)"
+
+
+def holds_up(pl: Player, c: dict, side: str, *, opp: str, game_lines: dict | None, opp_row: dict | None,
+             grades: dict | None, qb_today: str, scoring: dict | None, fixed_spread: float) -> tuple[list, list]:
+    """Part 4: the facts of parts 1-3, each sorted by the direction it points -- the line set high (his
+    history or the game says less than the line) or set low. Every fact is a number printed in parts 1-3;
+    nothing is weighed or counted, and no side is named."""
+    m = c["market"]
+    bet, many, unit = SHOW[m][0], SHOW[m][1][1], SHOW[m][2]
+    high, low = [], []
+    line = c["line"]
+    S = season_read(pl, c)
+    if S is not None:
+        a, cl = S["all"], S["clean"]
+        n = a["n"]
+        if S["over"] * 2 != n:
+            (low if S["over"] * 2 > n else high).append(f"He went over {line:g} in {_of(S, S['over'], n)}.")
+        use, tag = (cl, f" {_without_special(S)}") if S["special_weeks"] and cl else (a, "")
+        if S["special_weeks"] and cl and S["over_clean"] * 2 != cl["n"]:
+            (low if S["over_clean"] * 2 > cl["n"] else high).append(
+                f"{_without_special(S)[0].upper() + _without_special(S)[1:]}, over {line:g} in {S['over_clean']} of {cl['n']}.")
+        st = half_up(use["stat"], "0.1")
+        if st != line:
+            (low if st > line else high).append(f"He averaged {d1(use['stat'])} {bet} {_scope(S)}{tag}, against a {line:g} line.")
+        b = value(c, "book_expects")
+        if b is not None:
+            bs, ws = shown_work(b), half_up(use["work"], "0.1")
+            if bs != ws:
+                (high if bs > ws else low).append(
+                    f"The book's 50/50 needs about {_work(b)[1:]} {many} (our math); he averaged {d1(use['work'])}{tag}.")
+    if opp_row and opp_row.get("value") is not None and not opp_row.get("error"):
+        ov, mine = half_up(opp_row["value"], "0.1"), half_up(c["rate"] * SHOW[m][3], "0.1")
+        if ov != mine:
+            (low if ov > mine else high).append(
+                f"{city(opp)} has allowed {d1(opp_row['value'])} {unit}{opp_row.get('who', '')}; "
+                f"his longer-run rate is {mine:.1f}.")
+    kind = "run" if m == "rush_yds" else "pass"
+    gr = grades or {}
+    if gr.get("off") and gr.get("def") and not str(qb_today).endswith(" ruled Out."):
+        from .screen import grade_rank
+        o, d = grade_rank(gr["off"]), grade_rank(gr["def"])
+        if o is not None and d is not None and o != d:
+            (low if o < d else high).append(f"{pl.team} {kind} offense {gr['off']} vs {opp} {kind} defense {gr['def']}.")
+    imp = implied_totals(game_lines, pl.team, opp)
+    sc = (scoring or {}).get(pl.team)
+    if imp is not None and sc is not None and sc[2]:
+        it, pf = half_up(imp[pl.team], "0.1"), half_up(sc[0], "0.1")
+        if it != pf:
+            (low if it > pf else high).append(f"{pl.team} is implied {it:.1f} points; it has scored {pf:.1f} a game.")
+    if game_lines and game_lines.get("favorite") in (pl.team, opp) and not game_lines.get("spread_unread"):
+        pts = float(game_lines.get("points") or 0)
+        if pts >= fixed_spread:
+            fav = game_lines["favorite"] == pl.team
+            who = f"{pl.team} is favored by {pts:g}" if fav else f"{pl.team} is a {pts:g}-point underdog"
+            if m == "rush_yds":
+                (low if fav else high).append(f"{who}: teams ahead tend to run more.")
+            else:
+                (high if fav else low).append(f"{who}: teams behind tend to throw more.")
+    return high, low
+
+
+HOLDS_NOTE = "Sorted from parts 1-3, not weighed: none of this is tested, and it is not a chance."
+
+
 def matchup_md(pl: Player, market: str, opp: str, lines_: dict | None, why_none: str = "",
-               grades: dict | None = None, qb_today: str = "") -> list[str]:
+               grades: dict | None = None, qb_today: str = "", grades_all: list | None = None,
+               scoring: dict | None = None) -> list[str]:
     """The chat card's matchup (the user, 2026-10-11: the grades and the spread must be easy to find): a
-    two-column table of the same facts the text card's MATCHUP block prints."""
+    two-column table of the same facts the text card's MATCHUP block prints. With grades_all, every unit
+    pairing replaces the one grade line (part 3, DECISIONS #249)."""
     kind = "run" if market == "rush_yds" else "pass"
-    out = ["**Matchup**", "", "| Matchup | This game |", "|---|---|"]
-    if grades and grades.get("off") and grades.get("def"):
+    out = ["**3 · Matchup**", "", "| Matchup | This game |", "|---|---|"]
+    if grades_all:
+        pass                                   # every pairing is printed below, with the implied points
+    elif grades and grades.get("off") and grades.get("def"):
         out += [f"| {pl.team} {kind} offense | {_cell(grades['off'])} |", f"| {opp} {kind} defense | {_cell(grades['def'])} |"]
     else:
         out.append(f"| {pl.team} {kind} offense vs {opp} {kind} defense | "
                    f"{_cell((grades or {}).get('note') or 'grades not available.')} |")
     out.append(f"| Spread and total | {_cell(spread_sentence(lines_, why_none))} |")
+    out += [f"| {_cell(a)} | {_cell(b)} |" for a, b in matchup_extra(pl.team, opp, lines_, grades_all, scoring)]
     if qb_today:
         out.append(f"| Quarterback | {_cell(qb_today)} |")
     return out
@@ -492,7 +765,7 @@ def _parts(pl: Player, c: dict, side: str) -> dict:
 
 def render(pl: Player, c: dict, side: str, *, opp: str, game_lines: dict | None = None, why_no_lines: str = "",
            footer: str = "", opp_row: dict | None = None, grades: dict | None = None, line_note: str = "",
-           qb_today: str = "") -> str:
+           qb_today: str = "", grades_all: list | None = None, scoring: dict | None = None) -> str:
     """One side's card, in the spec's layout (card rules 1-15, as amended).
     opp_row: {"value", "games", "who"} from opponent.allows (display only);
     grades: matchup.grade_pair's result (display only); footer: one line."""
@@ -504,10 +777,28 @@ def render(pl: Player, c: dict, side: str, *, opp: str, game_lines: dict | None 
     if line_note:                              # the lookup skipped newer saved quotes: say so above the numbers
         out += _wrap(f"Check first: {line_note}.")
     out += _title(pl, c, side) + [""]
+    out.append("1 THE LINE")
+    for label, val in line_part(pl, c, side):
+        out += _wrap(f"{label}: {val}")
+    out.append("")
     if P["bar"] is not None:
         out.append(f"Bar for this price  {P['bar_text']}")
     else:
         out += _wrap(f"Bar for this price: {P['bar_text']}.")
+    S = season_read(pl, c)
+    out += ["", "2 THIS SEASON" if S is None or S["scope"] == "season" else "2 HIS LAST GAMES"]
+    if S is None:
+        out.append(f"No games before week {pl.week}.")
+    else:
+        head, body = season_table(pl, c, S)
+        for cells in body:
+            out += _wrap(f"Wk {cells[0]} {cells[1]}: {cells[2]} {many}, {cells[3]} {STAT_HEAD[m].lower()}, "
+                         f"{cells[4]} {RATE_HEAD[m].lower()}, snaps {cells[5]}")
+            if cells[6] != "-":
+                out += _wrap(f"  {cells[6]}")
+        for x in season_lines(c, S):
+            out += _wrap(x)
+    out.append("")
     last, rows = _last_line(pl, c)
     out += last
     if P["bar"] is not None:
@@ -533,7 +824,15 @@ def render(pl: Player, c: dict, side: str, *, opp: str, game_lines: dict | None 
         out += _wrap(_opp_line(opp, opp_row, P["rate_long"]))
     else:
         out += ["", f"Only {c['usual_games']} games: no recent average yet."]
-    out += [""] + matchup_lines(pl, m, opp, game_lines, why_no_lines, grades, qb_today)
+    out += [""] + matchup_lines(pl, m, opp, game_lines, why_no_lines, grades, qb_today, grades_all, scoring)
+    high, low = holds_up(pl, c, side, opp=opp, game_lines=game_lines, opp_row=opp_row, grades=grades,
+                         qb_today=qb_today, scoring=scoring, fixed_spread=c["script_spread"])
+    out += ["", "4 DOES IT HOLD UP"]
+    for head_, facts in (("Points to the line set high:", high), ("Points to it set low:", low)):
+        out.append(head_)
+        for x in facts or ["nothing on this card"]:
+            out += _wrap(f"- {x}")
+    out += _wrap(HOLDS_NOTE)
     q = question(m, side, P["work_ask"], P["rate_ask"], P["reached"], len(rows), P["split"])
     if q:
         out += [""] + _wrap(q)
@@ -573,7 +872,8 @@ def _md_notes(rows: list[tuple], season: int) -> list[str]:
 
 def render_md(pl: Player, c: dict, side: str, *, opp: str, game_lines: dict | None = None, why_no_lines: str = "",
               footer: str = "", opp_row: dict | None = None, grades: dict | None = None, line_note: str = "",
-              qb_today: str = "", matchup: bool = True) -> str:
+              qb_today: str = "", matchup: bool = True, grades_all: list | None = None,
+              scoring: dict | None = None) -> str:
     """The same card laid out for chat (the user's layout, 2026-10-11; DECISIONS #238): normal markdown,
     two-column tables, bold only on what the bet needs, and a condition instead of a question. Every
     number comes from _parts, as on the text card; nothing is added but layout and the condition."""
@@ -584,12 +884,25 @@ def render_md(pl: Player, c: dict, side: str, *, opp: str, game_lines: dict | No
     out += [f"Reliability: {TEST_STATUS.get(m, 'Check first: workload bar untested.')}", ""]
     if line_note:
         out += [f"Check first: {line_note}.", ""]
+    # part 1: the line, the book's 50/50, and what it asks against his history (DECISIONS #249)
+    out += ["**1 · The line**", "", "| The line | This leg |", "|---|---|"]
+    out += [f"| {_cell(a)} | {_cell(b)} |" for a, b in line_part(pl, c, side)] + [""]
     out += [f"**Average workload needed: {P['bar_text']}**", ""]
     if c["usual"] is not None and P["bar"] is not None:
         out += [f"| Workload | {many[0].upper() + many[1:]} |", "|---|---|",
                 f"| Needed at this price | **{P['bar_text']}** |",
                 f"| Recent {len(rows)}-game average | {d1(c['usual'])} |",
                 f"| Difference from recent | {difference(m, side, work_ask(P['bar'], c['usual']))} |", ""]
+    S = season_read(pl, c)
+    out += ["**2 · This season**" if S is None or S["scope"] == "season" else "**2 · His last games**", ""]
+    if S is None:
+        out += [f"No games before week {pl.week}.", ""]
+    else:
+        head, body = season_table(pl, c, S)
+        out += ["| " + " | ".join(head) + " |", "|" + "---|" * len(head)]
+        out += ["| " + " | ".join(_cell(x) for x in cells) + " |" for cells in body] + [""]
+        for x in season_lines(c, S):
+            out += [x, ""]
     hist = []
     if rows:
         tabled = c["usual"] is not None and P["bar"] is not None
@@ -632,7 +945,15 @@ def render_md(pl: Player, c: dict, side: str, *, opp: str, game_lines: dict | No
         out += [f"Only {c['usual_games']} games: no recent average yet. The bar assumes {P['assumed_text']}: "
                 f"{P['window'][0].lower() + P['window'][1:]}.", ""]
     if matchup:              # off in a screen or game read: the game header prints it once (DECISIONS #243)
-        out += matchup_md(pl, m, opp, game_lines, why_no_lines, grades, qb_today) + [""]
+        out += matchup_md(pl, m, opp, game_lines, why_no_lines, grades, qb_today, grades_all, scoring) + [""]
+    else:
+        out += ["Part 3, the matchup, is in the game header above.", ""]
+    high, low = holds_up(pl, c, side, opp=opp, game_lines=game_lines, opp_row=opp_row, grades=grades,
+                         qb_today=qb_today, scoring=scoring, fixed_spread=c["script_spread"])
+    out += ["**4 · Does it hold up**", ""]
+    for head_, facts in (("Points to the line being set high:", high), ("Points to it being set low:", low)):
+        out += [head_, ""] + [f"- {x}" for x in (facts or ["nothing on this card"])] + [""]
+    out += [HOLDS_NOTE, ""]
     cond = condition(m, side, P["work_ask"], P["rate_ask"], P["reached"], len(rows), P["split"])
     if cond:
         out += [f"What needs to be true: {cond}", ""]
