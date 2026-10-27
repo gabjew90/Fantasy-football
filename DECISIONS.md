@@ -9303,3 +9303,14 @@ without them, (3) the matchup -- implied totals, who is favored, run and pass un
   the reasons listed under it; part 4 a grid, a row per factor and a column per line, each cell "▲ high",
   "▼ low" or "–" with its two numbers; "What needs to be true" a short Over/Under table.
 - The freeze otherwise stands to 2026-11-02.
+
+## 2026-10-26 (250) -- the catch rate is shown as a percent
+
+The user, on the card preview: "doesn't this make more sense as a percentage?" Every card, the player card,
+the screen's checks and the opponent figure now show the catch rate as a percent ("61.5% catch rate",
+the table heading "Catch rate (%)") instead of catches per 10 targets; an ask on it is said in points
+("5 more points of catch rate"). The same number times ten, shown in whole percent -- one point is
+exactly the old 0.1 per 10, so every rounding, comparison and screen mark is as before (the review's
+point: one-decimal percent would have changed the screen's marks the week-8 rerun is pre-registered on);
+the model, the bars and every test result are unchanged (card.SHOW's factor 100, opponent.allows' value in percent, card.rate_str joins a rate to
+its unit in one place).

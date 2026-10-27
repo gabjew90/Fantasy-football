@@ -32,7 +32,7 @@ def _items():
         return {"opp": "TB", "game_lines": GL, "opp_row": row, "grades": grades, "qb_today": "", "scoring": SCORING,
                 "grades_all": GA, "line_note": "Test Back is listed Questionable on this week's official injury report"}
     return [{"pl": pl, "c": rec, "stub": stub, "md_footer": "Sleeper line as of Oct 26, 2:56 PM PT.",
-             "shown": shown({"value": 6.1, "games": 4, "who": " to RBs"}, {"off": "A-", "def": "B"})},
+             "shown": shown({"value": 61.0, "games": 4, "who": " to RBs"}, {"off": "A-", "def": "B"})},
             {"pl": pl, "c": rush, "stub": stub, "md_footer": "Sleeper line as of Oct 26, 2:56 PM PT.",
              "shown": shown(OPP, {"off": "B", "def": "C"})}]
 
@@ -65,7 +65,7 @@ def test_one_card_holds_every_line_and_both_sides():
     assert "| Week | Opp | Targets | Catches | Rec yds | Yds/target | Snaps |" in L
     assert "| 2 * | PHI | 12 | 30 | 2.5 | 12% |" in L and "| 2 * | PHI | 2 | 1 | 4 | 2.0 | 12% |" in L
     assert "- Week 2 *: left early (Out next game)" in L and "- Week 3 *: Lead Back out" in L
-    assert "| Rush yds 64.5 at 15.5 carries | Yards a carry |" in L and "| Over needs | 4.7 |" in L
+    assert "| Rush yds 64.5 at 15.5 carries | Yards per carry |" in L and "| Over needs | 4.7 |" in L
     assert "| Average (4) |  | 15.5 | 57.8 | 3.7 |  |" in L and "| Without * (2) |  | 15.5 | 51.5 | 3.3 |  |" in L
     # what needs to be true: one short table, a row per line and a column per side, the basis said once
     i = L.index("What needs to be true")

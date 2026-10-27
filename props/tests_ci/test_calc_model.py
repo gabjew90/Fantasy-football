@@ -450,7 +450,7 @@ def test_the_closing_question_follows_the_four_cases_and_turns_round_for_unders(
     assert q("rush_yds", "over", 0.2, 0.9) == "Workload is there. 0.9 more yards a carry?"          # 0.2 -> 0
     assert q("rush_yds", "over", 2.8, -0.2) == "At his longer-run rate it clears. About 3 more carries?"
     assert q("receptions", "over", -2.1, -1.5) == "Room for about 2 fewer targets?"
-    assert q("receptions", "over", 1.1, 0.5) == "About 1 more target, or 0.5 more catches per 10 targets?"
+    assert q("receptions", "over", 1.1, 5.0) == "About 1 more target, or 5 more points of catch rate?"
     assert q("rush_yds", "over", 0.1, 0.04) == "Recent workload and rate both meet the bar."
     # an Under needs less: a bar below his average and a needed rate below the assumed rate
     assert q("rush_yds", "under", -3, -0.9) == "About 3 fewer carries, or 0.9 less yards a carry?"

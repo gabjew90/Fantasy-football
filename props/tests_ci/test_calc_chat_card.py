@@ -83,7 +83,7 @@ def test_the_condition_states_the_same_asks_as_the_question():
     assert cnd("rush_yds", "over", 0.1, -0.1) == "His recent workload and rate both meet the bar."
     assert cnd("rush_yds", "over", -2.0, -0.1) == "His recent workload and rate meet the bar, with room for about 2 fewer carries."
     assert cnd("rush_yds", "under", -1.1, None) == "He needs about 1 fewer carry than his recent average."
-    assert cnd("receptions", "over", None, 0.5) == "He needs 0.5 more catches per 10 targets than his longer-run rate."
+    assert cnd("receptions", "over", None, 5.0) == "He needs 5 more points of catch rate than his longer-run rate."
     assert cnd("rush_yds", "under", None, -0.3) == "He needs 0.3 yards a carry less than his longer-run rate."
     assert cnd("rush_yds", "over", -1.0, None, reached=1) == "His recent average meets the bar, but only 1 of his last 4 games did."
     assert cnd("rush_yds", "over", None, None) == "" == q("rush_yds", "over", None, None)
@@ -94,14 +94,25 @@ def test_every_rate_names_its_unit_on_both_cards():
     season, window = _games()
     pl = _player(season, window)
     c = card.compute(pl, rec_model(0.75), "receptions", 1.5, 1.8, 1.9, fixed)
-    row = {"value": 6.71, "games": 5, "who": " to RBs"}
+    row = {"value": 67.1, "games": 5, "who": " to RBs"}
     text = " ".join(card.render(pl, c, "over", opp="TB", opp_row=row).splitlines())
     md = card.render_md(pl, c, "over", opp="TB", opp_row=row)
-    assert re.search(r"His longer-run rate \(5 games\): \d\.\d catches per 10 targets", text)
-    assert re.search(r"This season: \d\.\d catches per 10 targets", text)
-    assert "Tampa Bay allows: 6.7 catches per 10 targets to RBs (5 games)" in text
-    assert "| Catches per 10 targets | Rate |" in md and "| Opponent has allowed | 6.7 catches per 10 targets to RBs |" in md
-    assert re.search(r"\| This season \| \d\.\d catches per 10 targets( \(\d+ targets\))? \|", md)
+    # the catch rate is a percent (the user, 2026-10-26), its sign on the number
+    assert re.search(r"His longer-run rate \(5 games\): \d+% catch rate", text)
+    assert re.search(r"This season: \d+% catch rate", text)
+    assert "Tampa Bay allows: 67% catch rate to RBs (5 games)" in text
+    assert "| Catch rate (%) | Rate |" in md and "| Opponent has allowed | 67% catch rate to RBs |" in md
+    assert re.search(r"\| This season \| \d+% catch rate( \(\d+ targets\))? \|", md)
+    assert card.rate_str(4.43, "yards a carry") == "4.4 yards a carry" and card.rate_str(61.5, "% catch rate") == \
+        "62% catch rate"
+
+
+def test_a_whole_percent_is_exactly_the_old_tenth_per_10():
+    """DECISIONS #250: the catch rate's step is one point, the old 0.1 per 10 targets, so every rounding the
+    screen's marks and the card's asks compare is unchanged -- including the half-up edge."""
+    for per10 in (6.14, 6.15, 6.149999, 7.25, 0.05, 9.95):
+        assert card.shown_rate(per10 * 10, "receptions") == card.half_up(per10, "0.1") * 10
+    assert card.shown_rate(4.43, "rush_yds") == 4.4 and card.rate_num(61.0, "receptions") == "61"
 
 
 def test_out_of_range_bars_and_the_not_enough_card_in_chat():

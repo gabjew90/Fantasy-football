@@ -3,7 +3,7 @@ this season before the priced week, in the same unit as the needed rate
 (card rule 8). Display only: nothing here changes a bar or a rate.
 
 - rushing yards: yards a carry allowed to running backs
-- receptions: catches per 10 targets allowed to his position (WR, TE or RB)
+- receptions: catch rate allowed to his position (WR, TE or RB), in percent
 - receiving yards: yards a target allowed to his position (incompletions 0)
 - passing yards: yards a completion allowed (every passer)
 
@@ -66,7 +66,7 @@ def allows(b, market: str, opp: str, position: str | None, season: int, week: in
     if d.empty:
         return out
     if market == "receptions":
-        value = float(10 * d["caught"].mean())
+        value = float(100 * d["caught"].mean())
     else:                                      # yards a carry, or yards a target (data.targets: incompletions are 0)
         value = float(d["yards"].sum() / len(d))
     return {**out, "value": value, "plays": int(len(d))}

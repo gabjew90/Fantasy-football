@@ -168,13 +168,14 @@ def rates_part(items: list[dict]) -> list[str]:
             continue
         po, pu = C._parts(pl, c, "over"), C._parts(pl, c, "under")
         span = po["window"].split("(", 1)[1].rstrip(")")          # "16 games, 10 from last season"
-        out += [_row([f"{_label(c)} at {C.d1(c['usual'])} {po['many']}", po["rate_long"].capitalize()]), "|---|---|",
-                _row(["Over needs", po["need_text"].replace(f" {po['rate_long']}", "")]),
-                _row(["Under needs", pu["need_text"].replace(f" {pu['rate_long']}", "")]),
-                _row([f"His longer-run rate ({span})", po["assumed_text"].replace(f" {po['rate_long']}", "")]),
-                _row(["This season", po["season_rate"].replace(f" {po['rate_long']}", "")]),
-                _row(["Opponent has allowed", C._opp_cell(g["shown"].get("opp_row"), po["rate_long"])
-                      .replace(f" {po['rate_long']}", "")]), ""]
+        u = po["rate_long"]
+        bare = lambda t: t.replace(f" {u}", "").replace(u, "")      # noqa: E731 -- the title names the unit
+        out += [_row([f"{_label(c)} at {C.d1(c['usual'])} {po['many']}", C.RATE_TITLE[c["market"]]]), "|---|---|",
+                _row(["Over needs", bare(po["need_text"])]),
+                _row(["Under needs", bare(pu["need_text"])]),
+                _row([f"His longer-run rate ({span})", bare(po["assumed_text"])]),
+                _row(["This season", bare(po["season_rate"])]),
+                _row(["Opponent has allowed", bare(C._opp_cell(g["shown"].get("opp_row"), u))]), ""]
     return out
 
 
