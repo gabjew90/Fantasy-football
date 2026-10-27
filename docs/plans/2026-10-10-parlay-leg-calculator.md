@@ -256,7 +256,7 @@ Line as of [Mon D, H:MM AM/PM] PT.
 | Bet type | Workload | Rate | Opponent row |
 |---|---|---|---|
 | Rushing yards | carries | yards a carry | yards a carry allowed to RBs |
-| Receptions | targets | catches per 10 targets | catches per 10 targets allowed to his position |
+| Receptions | targets | catch rate, shown in whole percent (DECISIONS #250; was catches per 10 targets) | catch rate allowed to his position, in percent |
 | Receiving yards | targets | yards a target (an incompletion is 0) | yards a target allowed to his position |
 | Passing yards | completions | yards a completion | yards a completion allowed |
 

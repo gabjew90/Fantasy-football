@@ -133,7 +133,7 @@ def side_row(pl, c: dict, side: str, shown: dict, stub: dict, other_bar: float |
     unit = card.SHOW[m][1][1]
     sol = c["solutions"].get(f"rate_needed_{side}")
     need_status = card.calc.side_result(side, sol.status) if sol is not None else None
-    need = card.shown_rate(P["need"]) if P["need"] is not None else None
+    need = card.shown_rate(P["need"], m) if P["need"] is not None else None
     row = {"player": stub["player"], "team": stub["team"], "market": m, "side": side, "line": c["line"],
            "mult": c[f"mult_{side}"], "gsis_id": stub["gsis_id"], "game_id": stub["game_id"], "week": stub["week"],
            "season": stub["season"], "bar": P["bar"], "flags": []}
@@ -163,10 +163,10 @@ def side_row(pl, c: dict, side: str, shown: dict, stub: dict, other_bar: float |
     row["cushion"] = gap / swing if gap is not None and swing is not None else None
     row["workload"] = (f"{card.d1(usual)} avg vs {P['bar_text']}" if P["bar"] is not None and usual is not None
                        else P["bar_text"])
-    longer = card.shown_rate(P["assumed"])
-    vs = (f"{need:.1f} needed" if need is not None
+    longer = card.shown_rate(P["assumed"], m)
+    vs = (f"{card.rate_num(need, m)} needed" if need is not None
           else ("any rate clears" if need_status == "always" else "no rate clears"))
-    row["longer"] = f"{longer:.1f} vs {vs} ({len(pl.window)} g, {rate.own_n} {unit})"
+    row["longer"] = f"{card.rate_num(longer, m)} vs {vs} ({len(pl.window)} g, {rate.own_n} {unit})"
 
     marks = []
     # consistency: at or past the bar in more than half his season games
@@ -177,22 +177,22 @@ def side_row(pl, c: dict, side: str, shown: dict, stub: dict, other_bar: float |
         at = f"{n}+" if side == "over" else f"{n} or fewer"
         marks.append(("consistency", "✓" if hit * 2 > of else "✗", f"{'✓' if hit * 2 > of else '✗'} {hit} of {of} at {at}"))
     # his season rate against the needed rate (the card's minimum sample)
-    seas = card.shown_rate(rate.season * P["k"]) if rate.season is not None else None
+    seas = card.shown_rate(rate.season * P["k"], m) if rate.season is not None else None
     sample = f"({len(pl.season_games)} g, {rate.season_n} {unit})"
     if seas is None or rate.season_n < c["season_min"] or usual is None or need_status not in ("ok", "always", "never"):
-        marks.append(("season rate", "–", f"– {seas:.1f} {sample}" if seas is not None else "– none"))
+        marks.append(("season rate", "–", f"– {card.rate_num(seas, m)} {sample}" if seas is not None else "– none"))
     else:
         ok = need_status == "always" or (need_status == "ok" and _cmp(side, seas, need))
-        marks.append(("season rate", "✓" if ok else "✗", f"{'✓' if ok else '✗'} {seas:.1f} {sample}"))
+        marks.append(("season rate", "✓" if ok else "✗", f"{'✓' if ok else '✗'} {card.rate_num(seas, m)} {sample}"))
     # the opponent's allowed rate against the needed rate
     o = shown.get("opp_row") or {}
     if o.get("value") is None or o.get("error") or usual is None or need_status not in ("ok", "always", "never"):
         marks.append(("opponent", "–", f"– {card._opp_cell(o or None, P['rate_long'])}"))
     else:
-        ov = card.half_up(o["value"], "0.1")
+        ov = card.shown_rate(o["value"], m)
         ok = need_status == "always" or (need_status == "ok" and _cmp(side, ov, need))
         marks.append(("opponent", "✓" if ok else "✗",
-                      f"{'✓' if ok else '✗'} {ov:.1f} ({o['games']} g, {o.get('plays', 0)} plays)"))
+                      f"{'✓' if ok else '✗'} {card.rate_num(ov, m)} ({o['games']} g, {o.get('plays', 0)} plays)"))
     # the grade matchup: offense against defense (an Under wants the defense graded higher)
     gr = shown.get("grades") or {}
     off, dfn = (grade_rank(gr["off"]), grade_rank(gr["def"])) if gr.get("off") and gr.get("def") else (None, None)
