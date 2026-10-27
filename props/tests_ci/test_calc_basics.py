@@ -924,9 +924,9 @@ def test_opponent_allows_by_position_without_garbage_time():
     # rushing: RB carries in weeks 1-4, win chance 10-90%: (4 + 6 + 2 + 8) / 4 = 5.0 (the week-5 one is cut)
     assert opponent.allows(b, "rush_yds", "TB", "RB", 2026, 5, fixed) == {
         "value": 5.0, "games": 4, "who": " to RBs", "plays": 4, "thin": False, "left_out": 0}
-    # receptions to WRs: 3 of 4 caught = 7.5 per 10
+    # receptions to WRs: 3 of 4 caught = a 75% catch rate
     got = opponent.allows(b, "receptions", "TB", "WR", 2026, 5, fixed)
-    assert got["value"] == pytest.approx(7.5) and got["who"] == " to WRs"
+    assert got["value"] == pytest.approx(75.0) and got["who"] == " to WRs"
     thin = opponent.allows(b, "rush_yds", "TB", "RB", 2026, 4, fixed)          # three games before week 4
     assert thin["value"] is None and thin["games"] == 3 and thin["thin"]
     # a carrier with no listing this season falls back to last season's; one with none at all, and a play with

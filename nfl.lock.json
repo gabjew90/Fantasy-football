@@ -108,7 +108,7 @@
   "props/calc/__main__.py": "4c9ce18b03b3ee20135d06d560146e1843939a704a3cf03ff2f83be6b93089ca",
   "props/calc/calc.py": "9b9472bcf630bbfc6cb3b8a59dad2b5075e9183edc17bd9107feff697f315a9c",
   "props/calc/capture.py": "78323881ef032127ee7ce4ff20a8915ef539453215ed83246b6f03c6c3621950",
-  "props/calc/card.py": "2bf8f5aad4c2dcb117c9e177dac4b8e4ce02d42c1ea51e5987dfad6a47eec36d",
+  "props/calc/card.py": "6761ec1a41c35cb49ca3d743715515b71ea41209e386cfd6094669b8b88847fe",
   "props/calc/checks.py": "cc3738475c67747bb756216e50dc745fbed07fe0ffc532e9dba7d615202e3ed0",
   "props/calc/data.py": "0f04c67ae5c9df5ccdaf2870845f87fb50a3642f2912ba33b205f2afa952a603",
   "props/calc/fixture.py": "479381430e5be3cf7de01f89bc8cfa8eb14794ab2df8e0849f41fe13b46c3886",
@@ -120,9 +120,9 @@
   "props/calc/matchup.py": "1224d830ed674a1214774fdb3725b885185c8502e9b785c29422df67935eccf7",
   "props/calc/names.py": "9eaa5617dd8d5ad2758ab529976928fb34b05d938b7eddbb7ab97fb5d555339c",
   "props/calc/odds.py": "e0096cc1f7b98e885268b8f01ac475260be75af3a5cc18485224b3e10a562c8f",
-  "props/calc/opponent.py": "1a657b51f9b0463c8e6c9598a490ddd81e1270911a164777828b3c524a4b65f0",
+  "props/calc/opponent.py": "7398b2cd2acf21fd532f9bdd3d84737effeaf958fb718ba58030f8d7471ab13d",
   "props/calc/player.py": "2162e0353d852e7af8ef06c2cc4fa9c5ca1632158f47d81cf6827baedde3548f",
-  "props/calc/player_card.py": "3894074ba03202023ee567be1bd7547a2a0e481b0f97443633ebc64315599bff",
+  "props/calc/player_card.py": "ee5450f7beb87a9e9a9b3c98de823a79822414d60abce3af92c5ffee0ca11157",
   "props/calc/rates.py": "0f29f11067e197df4375ffde997b0059757efd407a2e4bbdbcb8a0ea9793ed0f",
   "props/calc/screen.py": "ab786abb8dee146b0f2dfd421a0a9053f5190508ae2a931e8c4d9730e6e257b1",
   "props/calc/settings.py": "0e4dae8cd1a3be3ac6fc416d6a9048fa362d8427abb445f957c974da98a8ba3d",
@@ -207,6 +207,6 @@
   "scripts/bootstrap.py": "8c6c428d7b66fde19ea8894d5124a0c182ba3f9719db6031f4904459e3b8cdd7",
   "scripts/release.py": "0bdf24c73b040deb17c649e9d7badb9a71edaac6a6044f237be6e0e246ee804e"
  },
- "sha256": "d5a9f1ee153b9fbd712a6078cf2c83e64247f0536886504e46b6f63977e06987",
- "tag": "nfl-v1.85"
+ "sha256": "364c3a85fbc8a34e944a20220c418cf86af89421985628e16ceabe8c69c485b0",
+ "tag": "nfl-v1.86"
 }

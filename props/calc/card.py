@@ -87,18 +87,28 @@ def even_line(outcomes) -> float:
 # every rate line: the user, 2026-10-11), and the factor from the model's rate to the shown one
 SHOW = {
     "rush_yds": ("rushing yards", ("carry", "carries"), "yards a carry", 1.0),
-    "receptions": ("catches", ("target", "targets"), "catches per 10 targets", 10.0),
+    "receptions": ("catches", ("target", "targets"), "% catch rate", 100.0),     # a percent (the user, 2026-10-26)
     "rec_yds": ("receiving yards", ("target", "targets"), "yards a target", 1.0),
     "pass_yds": ("passing yards", ("completion", "completions"), "yards a completion", 1.0),
 }
 # the chat card's rate-table heading, per market
-RATE_TITLE = {"rush_yds": "Yards per carry", "receptions": "Catches per 10 targets", "rec_yds": "Yards per target",
+RATE_TITLE = {"rush_yds": "Yards per carry", "receptions": "Catch rate (%)", "rec_yds": "Yards per target",
               "pass_yds": "Yards per completion"}
 RATE_KEY = {"rush_yds": "ypc", "receptions": "catch", "rec_yds": "ypt", "pass_yds": "ypcomp"}
 SHORT_NAME = {"rush_yds": "Rush yds", "receptions": "Catches", "rec_yds": "Rec yds", "pass_yds": "Pass yds"}
 WIDTH = 40
 # cities shared by two teams keep the full name
 SHARED_CITY = {"NYG", "NYJ", "LA", "LAC"}
+
+
+def rate_str(x: float, unit: str) -> str:
+    """A rate with its unit, one decimal: "4.4 yards a carry", "61.5% catch rate"."""
+    return f"{x:.1f}{'' if unit.startswith('%') else ' '}{unit}"
+
+
+def ask_words(market: str) -> str:
+    """The unit an ask on the rate is said in: a catch rate moves in points ("5 more points of catch rate")."""
+    return "points of catch rate" if market == "receptions" else SHOW[market][2]
 
 
 def value(c: dict, key: str) -> float | None:
@@ -212,8 +222,8 @@ def rate_split(market: str, side: str, longer: float | None, season: float | Non
         return ""
     unit = SHOW[market][2]
     if ok(longer):
-        return f"Rate clears at his longer-run {longer:.1f} {unit}, not at this season's {season:.1f}."
-    return f"Rate clears at this season's {season:.1f} {unit}, not at his longer-run {longer:.1f}."
+        return f"Rate clears at his longer-run {rate_str(longer, unit)}, not at this season's {season:.1f}."
+    return f"Rate clears at this season's {rate_str(season, unit)}, not at his longer-run {longer:.1f}."
 
 
 def _split_work(market: str, side: str, work_ask: float | None, reached: int | None, of: int, chat: bool) -> str:
@@ -266,7 +276,7 @@ def _question(market: str, side: str, work_ask: float | None, rate_ask: float | 
         work_ask = None if work_ask is None else -work_ask
         rate_ask = None if rate_ask is None else -rate_ask
     more, less, room = ("more", "more", "fewer") if side == "over" else ("fewer", "less", "more")
-    rate_words = SHOW[market][2]
+    rate_words = ask_words(market)
     w = lambda n: f"about {_num(n)} {more} {_unit(market, n)}"     # noqa: E731
     r = lambda n: f"{_num(n)} {less} {rate_words}"                 # noqa: E731
     if work_ask is None:
@@ -306,7 +316,7 @@ def condition(market: str, side: str, work_ask: float | None, rate_ask: float | 
         work_ask = None if work_ask is None else -work_ask
         rate_ask = None if rate_ask is None else -rate_ask
     more, less, room = ("more", "more", "fewer") if side == "over" else ("fewer", "less", "more")
-    rate_words = SHOW[market][2]
+    rate_words = ask_words(market)
     w = lambda n: f"about {_num(n)} {more} {_unit(market, n)} than his recent average"    # noqa: E731
     r = lambda n: (f"{_num(n)} more {rate_words} than his longer-run rate" if side == "over"     # noqa: E731
                    else f"{_num(n)} {rate_words} less than his longer-run rate")
@@ -569,7 +579,7 @@ def season_lines(c: dict, S: dict) -> list[str]:
     bet, many, unit = SHOW[m][0], SHOW[m][1][1], SHOW[m][2]
 
     def avg(a):
-        rate = f", {d1(a['rate'])} {unit}" if a["rate"] is not None else ""
+        rate = f", {rate_str(half_up(a['rate'], '0.1'), unit)}" if a["rate"] is not None else ""
         return f"{d1(a['work'])} {many}, {d1(a['stat'])} {bet}{rate} ({a['n']} games)"
     out = [f"Average {_scope(S)}: {avg(S['all'])}."]
     if S["special_weeks"]:
@@ -636,7 +646,7 @@ def holds_up(pl: Player, c: dict, side: str, *, opp: str, game_lines: dict | Non
                 f"{_work(bw)} vs {d1(use['work'])}{tag}")
     if opp_row and opp_row.get("value") is not None and not opp_row.get("error"):
         ov, mine = half_up(opp_row["value"], "0.1"), half_up(c["rate"] * SHOW[m][3], "0.1")
-        rows["Opponent's rate vs his longer-run rate"] = (_toward(ov, mine), f"{ov:.1f} vs {mine:.1f} {unit}")
+        rows["Opponent's rate vs his longer-run rate"] = (_toward(ov, mine), f"{ov:.1f} vs {rate_str(mine, unit)}")
     kind = "run" if m == "rush_yds" else "pass"
     gr = grades or {}
     if gr.get("off") and gr.get("def"):
@@ -784,13 +794,13 @@ def _parts(pl: Player, c: dict, side: str) -> dict:
         rr = calc.side_result(side, r.status) if r is not None else None
         if rr == "ok":
             need = r.value * k
-            need_text = f"{shown_rate(need):.1f} {rate_long}" + (" or less" if side == "under" else "")
+            need_text = rate_str(shown_rate(need), rate_long) + (" or less" if side == "under" else "")
         else:
             need_text = f"{'any' if rr == 'always' else 'no'} rate clears it"
         if rate.season is None:
             season_rate = f"no {many} yet"
         else:                                  # below the minimum: the number with its sample, never hidden
-            season_rate = f"{shown_rate(rate.season * k):.1f} {rate_long}" + (
+            season_rate = rate_str(shown_rate(rate.season * k), rate_long) + (
                 "" if rate.season_n >= c["season_min"] else f" ({rate.season_n} {_unit(m, rate.season_n)})")
     # both asks from the numbers as displayed (the user, 2026-10-10): the bar as shown minus the
     # last-4 average as shown, then to the nearest half; the needed rate shown minus the recent rate shown
@@ -821,7 +831,7 @@ def _parts(pl: Player, c: dict, side: str) -> dict:
     split = rate_split(m, side, shown_rate(assumed), season_shown, shown_rate(need) if need is not None else None)
     return {"m": m, "bet": bet, "one": one, "many": many, "rate_long": rate_long, "k": k, "res": res, "top": top,
             "bar": bar, "bar_text": bar_text, "n": n, "rows": rows, "season_games": len(g), "season": season,
-            "assumed": assumed, "assumed_text": f"{shown_rate(assumed):.1f} {rate_long}",
+            "assumed": assumed, "assumed_text": rate_str(shown_rate(assumed), rate_long),
             "window": f"His longer-run rate ({len(win)} games{when})", "need": need, "need_text": need_text,
             "season_rate": season_rate, "work_ask": work_ask, "rate_ask": rate_ask, "reached": reached,
             "split": split, "marked": marked, "n_clean": len(clean), "usual_clean": usual_clean,
@@ -1049,7 +1059,7 @@ def _opp_cell(row: dict | None, unit: str) -> str:
         return f"only {row['games']} games"
     if row.get("value") is None:
         return f"no plays{row.get('who', '')} yet"
-    return f"{d1(row['value'])} {unit}{row.get('who', '')}"
+    return f"{rate_str(half_up(row['value'], '0.1'), unit)}{row.get('who', '')}"
 
 
 def _opp_note(opp: str, row: dict | None) -> str:
@@ -1071,8 +1081,8 @@ def _opp_line(opp: str, row: dict | None, unit: str = "") -> str:
     if row.get("value") is None:
         return f"{city(opp)} allows: no plays{row.get('who', '')} yet ({row['games']} games)"
     gaps = f"; {row['left_out']} plays left out (no win chance or roster listing)" if row.get("left_out") else ""
-    unit = f" {unit}" if unit else ""
-    return f"{city(opp)} allows: {d1(row['value'])}{unit}{row.get('who', '')} ({row['games']} games{gaps})"
+    shown = rate_str(half_up(row["value"], "0.1"), unit) if unit else d1(row["value"])
+    return f"{city(opp)} allows: {shown}{row.get('who', '')} ({row['games']} games{gaps})"
 
 
 def require_side(side: str) -> None:
