@@ -34,7 +34,7 @@ import pandas as pd
 from core import fetch as F
 from core.manifest import Manifest
 
-from . import capture, card, data, game_lines, lines, matchup, names, odds, opponent, player, settings, summary
+from . import capture, card, data, game_lines, lines, matchup, names, odds, opponent, player, player_card, settings, summary
 from .checks import DataError, number
 from .markets import workload_col
 from .shared import journal
@@ -339,6 +339,11 @@ def build_card(b, name_in: str, market: str, side: str = "over", *, team=None, s
         except DataError as ex:                      # a bad saved row is reported; code errors are not caught
             source = f"Unmatched: {ex}; give --line --over --under"
     opp = game["away_team"] if game["home_team"] == team else game["home_team"]
+    # his own listing on the week's official report, first on the card (the screen already leaves an Out
+    # player off its lists; a game read or a single leg said nothing -- DECISIONS #249)
+    own = own_status(b, gsis, season, wk)
+    if own:
+        line_note = "; ".join(x for x in (line_note, f"{name} {own}") if x)
     footer = line_footer(at_utc) if line is not None else source      # no line: why not
     kicked_off = pd.Timestamp(game["kickoff_utc"]) <= pd.Timestamp(dt.datetime.now(dt.timezone.utc))
     out = {"by_initial": by_initial[0], "kicked_off": kicked_off, "stub": stub, "line": line, "mult_over": mo,
@@ -348,12 +353,15 @@ def build_card(b, name_in: str, market: str, side: str = "over", *, team=None, s
     # the chat card names where the quote came from (the user's layout: "quote source and capture time")
     md_footer = footer.replace("Line as of", "Sleeper line as of", 1) if at_utc is not None else footer
     md_warn = warn.strip() + "\n\n" if warn else ""
+    # the cards below print no line_note: his own listing goes above them as a warning
+    early = warn + (f"Check first: {name} {own}.\n" if own else "")
+    early_md = early.strip() + "\n\n" if early else ""
     if market in pl.not_enough:                 # the data gap is the first thing to say, line or not
-        nmd = md_warn + card.render_not_enough_md(pl, market, side, line, mo, mu, footer=md_footer)
-        return {**out, "text": warn + card.render_not_enough(pl, market, side, line, mo, mu, footer=footer),
+        nmd = early_md + card.render_not_enough_md(pl, market, side, line, mo, mu, footer=md_footer)
+        return {**out, "text": early + card.render_not_enough(pl, market, side, line, mo, mu, footer=footer),
                 "md": nmd, "md_game": nmd}
     if line is None:
-        return {**out, "text": warn + source, "md": md_warn + source, "md_game": md_warn + source}
+        return {**out, "text": early + source, "md": early_md + source, "md_game": early_md + source}
     model = player.model(pl, market, tuned, fixed)
     c = card.compute(pl, model, market, line, mo, mu, fixed, target)
     gl, why = _game_line(game, season, wk, kicked_off)
@@ -361,15 +369,59 @@ def build_card(b, name_in: str, market: str, side: str = "over", *, team=None, s
                  opp_row=_display(lambda: _opp_allows(b, market, opp, pl.position, season, wk, fixed)),
                  grades=_display(lambda: matchup.grade_pair(b, team, opp, "run" if market == "rush_yds"
                                                              else "pass", season, wk, fixed)),
-                 qb_today=_display_text(lambda: qb_today(b, team, season, wk)))
+                 qb_today=_display_text(lambda: qb_today(b, team, season, wk)),
+                 grades_all=unit_grades(b, team, opp, season, wk, fixed),
+                 scoring=_display(lambda: {t: team_points(b.schedule, t, season, wk) for t in (team, opp)}))
     text = card.render(pl, c, side, footer=footer, **shown)
     md = card.render_md(pl, c, side, footer=md_footer, **shown)
     md_game = card.render_md(pl, c, side, footer=md_footer, matchup=False, **shown)
     return {**out, "c": c, "ready": True, "settings": tuned, "text": warn + text, "md": md_warn + md,
             "md_game": md_warn + md_game,          # a screen or game read: the matchup is in the game header
+            "md_footer": md_footer,                  # the player card (a game read) prints it once per quote
             "pl": pl, "shown": shown,                # the screen reads both sides from these (DECISIONS #240)
             # depths whose yards came from every position's catches (the "Calculation" follow-up; journal row)
             "pooled_depths": list(pl.receiving.get("pooled_all_positions", []))}
+
+
+def report_status(rep, gsis: str, wk: int) -> str | None:
+    """His status on a season's official report for week wk: Out, Doubtful or Questionable, else None.
+    One reader for the screen (which leaves an Out player off its lists) and the card's warning."""
+    me = rep[(rep["week"] == wk) & (rep["gsis_id"] == gsis)]
+    st = str(me["report_status"].iloc[-1]) if len(me) else ""
+    return st if st in ("Questionable", "Doubtful", "Out") else None
+
+
+def own_status(b, gsis: str, season: int, wk: int) -> str:
+    """'is ruled Out on this week's official injury report (Sleeper voids an Out player's leg)', or
+    'is listed Doubtful/Questionable on ...', or '' (not listed, or the report file cannot be read --
+    Bundle.injury_report turns an unreadable file into None; a code error is not caught)."""
+    rep = b.injury_report(season)
+    if rep is None or not len(rep):
+        return ""
+    st = report_status(rep[rep["season"] == season], gsis, wk)
+    if st == "Out":
+        return "is ruled Out on this week's official injury report (Sleeper voids an Out player's leg)"
+    if st in ("Doubtful", "Questionable"):
+        return f"is listed {st} on this week's official injury report"
+    return ""
+
+
+def unit_grades(b, team: str, opp: str, season: int, wk: int, fixed: dict) -> list:
+    """Part 3's unit pairings (DECISIONS #249): both teams' run and pass offense against the other's
+    defense, [(offense, defense, kind, grades)]; a pairing that cannot be read carries its note."""
+    return [(o, d, k, _display(lambda o=o, d=d, k=k: matchup.grade_pair(b, o, d, k, season, wk, fixed)))
+            for o, d in ((team, opp), (opp, team)) for k in ("run", "pass")]
+
+
+def team_points(schedule, team: str, season: int, wk: int) -> tuple:
+    """(points scored a game, allowed a game, games) in the team's played games this season before wk."""
+    t = player.played_before(schedule, team, season, wk)
+    if t.empty:
+        return (0.0, 0.0, 0)
+    home = t["home_team"] == team
+    pf = t["home_score"].where(home, t["away_score"])
+    pa = t["away_score"].where(home, t["home_score"])
+    return (float(pf.mean()), float(pa.mean()), len(t))
 
 
 def _md_lead(warn: str) -> str:
@@ -522,9 +574,7 @@ def screen(a) -> str:
             bars = {sd: card.value(c, f"needed_{sd}") for sd in ("over", "under")}
             status = None
             if inj_ok:
-                me = inj[(inj["week"] == wk) & (inj["gsis_id"] == got["stub"]["gsis_id"])]
-                st = str(me["report_status"].iloc[-1]) if len(me) else ""
-                status = st if st in ("Questionable", "Doubtful", "Out") else None
+                status = report_status(inj, got["stub"]["gsis_id"], wk)
             if status == "Out":             # Sleeper voids his leg: named below the tables, never ranked (DECISIONS #243)
                 ruled_out.setdefault(got["stub"]["player"], []).append(card.SHOW[p_["market"]][0])
                 continue
@@ -612,6 +662,8 @@ def game_header(b, g, season: int, fixed: dict, now) -> list[str]:
             else:
                 cell = gr.get("note") or "not available"
             L.append(f"| {off} {kind} offense vs {dfn} {kind} defense | {card._cell(cell)} |")
+    sc = _display(lambda: {t: team_points(b.schedule, t, season, wk) for t in (away, home)})
+    L += [f"| {card._cell(x)} | {card._cell(v)} |" for x, v in card.matchup_extra(away, home, gl, None, sc)]
     L.append("")
     for t in (away, home):
         if qb[t]:
@@ -720,16 +772,29 @@ def game(a) -> str:
             L += ["", f"No posted line in this game for: {x}."]
     key = "md_game" if getattr(a, "format", "text") == "md" else "text"
     gap = ["", "---", ""] if key == "md_game" else [""]          # one divider between chat cards
+    # one card per player: every line of his and both sides (the user, 2026-10-26; DECISIONS #249). A player
+    # with no line ready (not enough data, no usable quote) keeps the leg card that says why.
+    groups: dict = {}
     for p, got in pick:
-        for side in sides:
-            if side == "over":
-                L += gap + [got[key]]
-                continue
-            try:
-                L += gap + [build_card(b, got["stub"]["player"], p["market"], side, team=got["stub"]["team"],
-                                       season=season, week=wk, lookup=lookup)[key]]
-            except (player.NotFound, DataError, SystemExit) as ex:
-                L += gap + [f"{got['stub']['player']} {card.SHOW[p['market']][0]} {side}: card not built: {ex}"]
+        groups.setdefault((got["stub"]["team"], got["stub"]["player"]), []).append((p, got))
+    for (_, who), legs in groups.items():
+        ready = [got for _, got in legs if got.get("ready")]
+        if not ready or key == "text":         # the text format (Claude Code) keeps the 40-column leg cards
+            for p, got in legs:
+                for side in sides:
+                    if side == "over":
+                        L += gap + [got[key]]
+                        continue
+                    try:
+                        L += gap + [build_card(b, got["stub"]["player"], p["market"], side, team=got["stub"]["team"],
+                                               season=season, week=wk, lookup=lookup)[key]]
+                    except (player.NotFound, DataError, SystemExit) as ex:
+                        L += gap + [f"{got['stub']['player']} {card.SHOW[p['market']][0]} {side}: card not built: {ex}"]
+            continue
+        others = [f"{card.SHOW[p['market']][0].capitalize()} {got['line']:g}: "
+                  + ("not enough data, so no bar: " if got["not_enough"] else "") + got["reason"]
+                  for p, got in legs if not got.get("ready")]
+        L += gap + [player_card.render_md(ready, others, sides)]
     if not pick and not a.player:
         L += ["", "Cards: name players with --player, or print every line's cards with --all."]
     return (_md_lead(warn) if key == "md_game" else warn) + "\n".join(L)

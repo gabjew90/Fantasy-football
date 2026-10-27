@@ -9234,3 +9234,72 @@ sentence when his team has no row on the week's report yet ("Injury report not r
 cannot be read). nflverse's report lists only injured players, so a team whose published report names
 nobody also reads as not published. No other change.
 
+
+## 2026-10-26 (249) -- the four-part leg read on the cards (the freeze lifted for it)
+
+The user lifted the #245 freeze ("lift the freeze") for the four-part read they specified: every leg card
+answers, in order, (1) where the line is and where the book puts 50/50, (2) how he has done this season in
+volume and efficiency, what special circumstances touched those games, and what the games look like
+without them, (3) the matchup -- implied totals, who is favored, run and pass units on both sides -- and
+(4) what the line expects against his history, whether the matchup supports it, and the risks.
+
+- **Part 1, the line.** Both sides' prices, the book's split at the posted line with the margin
+  removed, where the book's 50/50 sits -- the median game at the workload the prices imply, so uneven
+  prices (Pickens' catches 4.5 at -172/+104, 56/44) put it above or below the posted line -- (odds.no_vig;
+  labelled as the book's numbers, not a chance of ours), the workload that split implies under the
+  calculator's model (labelled our math), and both sides' bars. This reverses the 2026-10-10 rule that
+  kept "Line implies (our math)" and percentages off the default card: the user now asks for the book's
+  50/50 on every card.
+- **Part 2, this season.** The user: "if we have more than 4 games worth of data this season, just use
+  it." With more than 4 games this season (settings.yaml season_read_min_games: 5) the card prints every
+  game this season -- week, opponent, workload, stat, rate, snap share, and what was special about it --
+  with averages, the averages without the special games, and how often he beat the line and reached the
+  bar. With 4 or fewer it prints his last 4 games (back into last season) and says so. Special games:
+  left early (far fewer snaps AND listed Out, Doubtful or Questionable, or on injured reserve, for his
+  team's next game -- the boards' rule; a low-snap game with no listing is a role change and stays in);
+  a lineup change (the #247 check, per game with its reason; for a back's catches and receiving yards it
+  also counts the team's top 3 receivers); another quarterback started.
+- **Scope kept narrow, on purpose.** This is display: the bar, the pricing model's rate window, the
+  last-4 average and its asks, the screen's gate, cushion and order are unchanged -- the screen-order
+  rerun (#244) is pre-registered on them. Changing the model to season-only rates would need its own
+  measured test.
+- **Fix, a quarterback's own card:** backup_qb no longer marks the games a quarterback started himself
+  (a starter returning from injury had his own starts marked because another quarterback started the most
+  recent game). This one fix also reaches the screen: on such a quarterback's own passing card his own
+  starts no longer count as lineup changes in the last-4 check. A wrong number, so it is fixed now; it
+  touches only quarterback cards whose player did not start his team's most recent game.
+- **Part 3, matchup.** The chat card's matchup table prints both run and pass units for both teams, the
+  implied team totals (total and spread), and each team's points a game this season.
+- **Part 4, book vs history.** Facts only: the workload at the book's split against his season and
+  without-special-games averages, and his beat-the-line count; then "What needs to be true". The risks
+  are written by chat from a required checklist in CHAT.md (teammate returning or out, the share going
+  elsewhere, a quarterback change, game script, sample size, the market's test result).
+- **Found on the first live run (DAL at PHI, 2026-10-26):** every card now opens with the player's own
+  listing on the week's official report ("Check first: X is ruled Out ... (Sleeper voids an Out player's
+  leg)" / "is listed Questionable"); the screen already left Out players off its lists, but a game read
+  and a single leg said nothing (DeVonta Smith, Out, had cards). The game-script sentence follows its
+  direction (a favorite "throws less", an underdog "runs less").
+- **One card per player in a game read** (the user, 2026-10-26: "we don't need duplicate cards for
+  receiving yards, receptions, overs, unders"). props/calc/player_card.py prints every line of his and
+  both sides in one card: part 1 one column per line (prices, the book's split, where its 50/50 sits,
+  the workload the prices imply, both needs, his workload, over/under counts, test result), part 2 one
+  season table with every stat he is priced in, the rates table, part 4 with a fact every line shares
+  printed once, and each line-and-side's condition. Built only from the leg card's pieces (a test
+  holds every number outside the season table to his leg cards'). The leg card stays for `leg`,
+  `entry` (the journal logs its numbers) and the screen's rows (pre-registered for the rerun). The game
+  header gains implied points and each team's scoring. The separate catches-or-yards block is gone:
+  part 1's columns are that comparison; nothing names the better leg (#245).
+- **Where the book's 50/50 sits** is interpolated between half-point lines (catches and most yards are
+  whole numbers, so a plain median printed "about 1 catches" for a 1.5 line priced near even).
+- **"Special" means something was different in that game** (the user, 2026-10-26: "shouldn't it only be
+  special if somebody was out, not if that somebody is out presently?"). The season read's special games
+  are: he left early; a main teammate took no snap while on the roster (player.game_conditions); someone
+  other than the team's regular starting QB -- most starts this season -- started. Who is out today is
+  its own note ("Jalen Hurts (QB) is on IR; he started all 4 of these games"). The last-4 lineup check
+  (#247) keeps its own rule: the screen reads it and the rerun is pre-registered on it.
+- **Readability pass** (the user: "readability is the priority"): part 1 in three short tables (what
+  the book says, what each side needs, his history), test results said once, the 50/50 row says "at the
+  line" when the prices are even; part 2 a table per stat group with the averages as its last rows and
+  the reasons listed under it; part 4 a grid, a row per factor and a column per line, each cell "▲ high",
+  "▼ low" or "–" with its two numbers; "What needs to be true" a short Over/Under table.
+- The freeze otherwise stands to 2026-11-02.

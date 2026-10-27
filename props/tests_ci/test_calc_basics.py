@@ -24,7 +24,7 @@ from props.calc import capture, data, lines, names, odds, settings  # noqa: E402
 FIXED = {
     "season_type": "REG", "rate_window_games": 16, "pool_seasons": 2, "depth_short_below": 5,
     "depth_deep_from": 15, "sims": 20000, "seed": 20261010, "range_low_pct": 10, "range_high_pct": 90,
-    "result_margin": 8, "usual_games": 4, "fewer_snaps_share": 0.5, "tested_min_prior_games": 3, "top_targets": 3,
+    "result_margin": 8, "usual_games": 4, "fewer_snaps_share": 0.5, "season_read_min_games": 5, "script_spread": 3, "tested_min_prior_games": 3, "top_targets": 3,
     "garbage_wp_low": 0.10, "garbage_wp_high": 0.90, "thin_games": 4,
     "grade_score_epa_weight": 2 / 3, "grade_max_tiers": 6, "grade_tier_letters": "SABCDF",
     "grade_int_steps": [2, 3, 4, 5, 6, 8, 10, 12, 15, 20], "grade_tier_steps": [0.5, 1, 1.5, 2, 2.5, 3, 4, 5, 6, 8, 10],

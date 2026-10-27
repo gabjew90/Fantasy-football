@@ -46,15 +46,22 @@ def test_the_chat_card_follows_the_users_layout():
     assert "| His longer-run rate (5 games) | 4.2 yards a carry |" in L
     assert "| Opponent has allowed | 4.4 yards a carry to RBs |" in L
     assert "Opponent figure: 4 games, garbage time left out." in md
-    i = L.index("**Matchup**")
+    i = L.index("**3 · Matchup**")
     assert L[i + 2:i + 7] == ["| Matchup | This game |", "|---|---|", "| DAL run offense | B |",
                               "| TB run defense | C |", "| Spread and total | Dallas favored by 9.5. Total 49.5. |"]
     assert any(x.startswith("What needs to be true: ") for x in L) and "?" not in md
     assert L[-1] == "_Line as of Oct 8, 4:59 PM PT._"
-    assert "```" not in md and "~" not in md.replace(f"~{bar}", "")
+    # "~" only on workloads: the bar, the other side's bar and the workload the prices imply
+    book, under = card._round(card.value(c, "book_expects")), card._round(card.value(c, "needed_under"))
+    assert "```" not in md and "~" not in md.replace(f"~{bar}", "").replace(f"~{book}", "").replace(f"~{under}", "")
     # bold only on what the bet needs: the bar (heading and cell) and the needed rate
     bolds = re.findall(r"\*\*(.+?)\*\*", md)
-    assert bolds[0] == "Test Back · Rushing yards" and len(bolds) == 6 and "Matchup" in bolds, bolds
+    assert bolds[0] == "Test Back · Rushing yards" and "3 · Matchup" in bolds, bolds
+    # the four parts in order (DECISIONS #249)
+    heads = [L.index(x) for x in ("**1 · The line**", "**2 · This season**", "**3 · Matchup**",
+                                  "**4 · Does it hold up**")]
+    assert heads == sorted(heads)
+    assert len(bolds) == 9, bolds
 
 
 def test_every_number_on_the_chat_card_is_on_the_text_card():
@@ -125,13 +132,14 @@ def test_a_marked_game_and_the_short_history_reach_the_chat_card():
     pl = _player(season, window)
     c = card.compute(pl, rush_model(ypc=4.2), "rush_yds", 64.5, 1.8, 1.76, fixed)
     md, text = card.render_md(pl, c, "over", opp="TB"), card.render(pl, c, "over", opp="TB")
-    assert "Last 4: 12 · 12 · 19* · 19" in md and "Last 4: 12, 12, 19*, 19" in text
-    assert "* Week 3: played far fewer snaps than usual." in md.splitlines()
-    assert "* Week 3: B.Backup started at QB." in md.splitlines(), "two notes for one game: two bullets"
+    # the text card keeps the last-4 check's star and notes; the chat card's season table says what was
+    # different in each game, so its Last 4 line is the plain numbers (DECISIONS #249)
+    assert "Last 4: 12 · 12 · 19 · 19" in md and "Last 4: 12, 12, 19*, 19" in text
+    assert "B.Backup started at QB" not in md and "B.Backup started at QB" in text
     short = _player(season.iloc[:2], window.iloc[3:])                  # two games: weeks 3-4
     cs = card.compute(short, rush_model(ypc=4.2), "rush_yds", 64.5, 1.8, 1.76, fixed)
     smd = card.render_md(short, cs, "over", opp="TB")
-    assert "Last 2: 19* · 19" in smd and "Short history: 2 games." in smd
+    assert "Last 2: 19 · 19" in smd and "Short history: 2 games." in smd
     assert "| Workload |" not in smd and "no recent average yet" in smd
 
 
@@ -301,5 +309,6 @@ def test_the_chat_matchup_table_carries_the_qb_line_and_the_no_grades_note():
 def test_a_screen_or_game_card_leaves_the_matchup_to_the_game_header():
     pl, c, text, md = _rush()
     short = card.render_md(pl, c, "over", matchup=False, **KW)
-    assert "**Matchup**" in md and "**Matchup**" not in short and "Dallas favored" not in short
+    assert "**3 · Matchup**" in md and "**3 · Matchup**" not in short and "Dallas favored" not in short
+    assert "Part 3, the matchup, is in the game header above." in short
     assert short.replace("\n\n", "\n").count("What needs to be true") == 1

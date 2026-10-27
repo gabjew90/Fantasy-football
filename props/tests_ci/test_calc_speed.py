@@ -108,7 +108,8 @@ def test_a_blank_roster_team_and_an_unreadable_file_do_not_stop_the_game(tmp_pat
 def _fake_card(name, team, market, side, line=64.5, ready=True, not_enough=False):
     sol = lambda v: SimpleNamespace(status="ok", value=v)
     c = {"solutions": {"needed_over": sol(19.1), "needed_under": sol(15.6)}, "usual": 16.0}
-    return {"stub": {"player": name, "team": team, "game_id": GAME["game_id"]}, "ready": ready, "c": c,
+    # a not-enough card is never ready (build_card returns before the quote is priced)
+    return {"stub": {"player": name, "team": team, "game_id": GAME["game_id"]}, "ready": ready and not not_enough, "c": c,
             "line": line, "not_enough": not_enough, "reason": "12 carries in his last 16 games (needs 30)",
             "text": f"CARD {name} {market} {side}", "md": f"**MD+MATCHUP {name} {market} {side}**",
             "md_game": f"**MD {name} {market} {side}**"}
@@ -135,6 +136,10 @@ def one_load(monkeypatch):
         return _fake_card(name, kw["team"], market, side, not_enough=(name == "Backup Back"))
     monkeypatch.setattr(CLI, "build_card", card)
     monkeypatch.setattr(CLI, "game_header", lambda *a: ["GAME HEADER"])
+    # the player card (DECISIONS #249) is tested in test_calc_player_card; here it names what it was given
+    monkeypatch.setattr(CLI.player_card, "render_md", lambda ready, others, sides: (
+        f"PLAYER {ready[0]['stub']['player']} {'+'.join(sorted(g['line'] and g['stub']['team'] for g in ready))} "
+        f"{'/'.join(sides)} others={len(others)}"))
     return loads, built
 
 
@@ -161,13 +166,16 @@ def test_cards_for_the_players_named_both_sides_and_a_missing_name_is_said(one_l
     _loads, built = one_load
     out = CLI.game(Namespace(matchup="la@sf", player=["Christian McCaffrey", "Nobody"], all=False, side="both",
                              season=2026, week=6))
+    # the text format (Claude Code) keeps the 40-column leg cards, one per side
     assert "CARD Christian McCaffrey rush_yds over" in out and "CARD Christian McCaffrey rush_yds under" in out
-    assert "CARD Puka Nacua" not in out
+    assert "CARD Puka Nacua" not in out and "PLAYER" not in out
     assert "No posted line in this game for: Nobody." in out
     one = CLI.game(Namespace(matchup="LA@SF", player=[], all=True, side="under", season=2026, week=6))
-    assert one.count("CARD") == 2 and "over" not in " ".join(x for x in one.splitlines() if x.startswith("CARD"))
     assert "Puka Nacua receiving yards under: card not built: no under quote" in one, \
         "one side failing keeps the rest of the output"
+    md = CLI.game(Namespace(matchup="LA@SF", player=[], all=True, side="under", season=2026, week=6, format="md"))
+    assert md.count("PLAYER ") == 2 and "PLAYER Puka Nacua LA under others=0" in md, "chat: one card per player"
+    assert "**MD Backup Back rush_yds under**" in md, "a player with no line ready keeps the leg card that says why"
 
 
 def test_a_short_name_finds_the_player_and_a_failed_card_is_not_called_missing(one_load):
@@ -181,8 +189,8 @@ def test_a_short_name_finds_the_player_and_a_failed_card_is_not_called_missing(o
 def test_game_cards_in_chat_layout_have_one_divider_between_them(one_load):
     out = CLI.game(Namespace(matchup="LA@SF", player=["Christian McCaffrey"], all=False, side="both", season=2026,
                              week=6, format="md"))
-    assert "**MD Christian McCaffrey rush_yds over**" in out and "**MD Christian McCaffrey rush_yds under**" in out
-    assert "CARD " not in out and out.count("\n---\n") == 2 and "MATCHUP" not in out and "GAME HEADER" in out
+    assert "PLAYER Christian McCaffrey SF over/under others=0" in out
+    assert "CARD " not in out and out.count("\n---\n") == 1 and "MATCHUP" not in out and "GAME HEADER" in out
 
 
 def test_a_bad_matchup_or_a_missing_game_stops_plainly(one_load):

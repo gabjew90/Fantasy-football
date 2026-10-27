@@ -606,7 +606,14 @@ def test_chat_routes_the_strongest_overs_and_unders_to_the_screen():
 def test_chat_shows_the_chat_card_as_printed():
     chat = (ROOT / "CHAT.md").read_text(encoding="utf-8")
     rule = " ".join(chat[chat.index("3. **Show the chat card"):chat.index("4. **Follow-ups**")].split())
-    assert "`--format md`" in rule and "never inside a code block" in rule and "**Matchup read:**" in rule
+    assert "`--format md`" in rule and "never inside a code block" in rule and "**Risks:**" in rule
+    # the four-part read and its required risks checklist (DECISIONS #249)
+    for part in ("**1 · The line**", "**2 · This season**", "**3 · Matchup**", "**4 · Does it hold up**"):
+        assert part in rule, part
+    for item in ("a main teammate returning or newly out", "a quarterback change", "game script", "the sample",
+                 "the market's test result"):
+        assert item in rule, item
+    assert "**Matchup read:**" not in rule, "replaced by the Risks paragraph"
     assert "Never recompute, round, re-sort or reword a number, a unit or the Reliability line" in rule
     assert "3. **Show what it prints, in full and as printed**" not in chat, "the old as-printed rule is replaced"
 

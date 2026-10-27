@@ -241,9 +241,10 @@ print.
 
 The parlay-leg calculator (`props/calc/`, DECISIONS #232-#234) is THE tool for prop legs and
 Power Play entries in rushing yards, catches (receptions), receiving yards and passing yards.
-For one side of a leg it states the workload that price needs (the bar), his last 4 games, how
-often he reached the bar this season, the rate needed at his recent workload beside his own
-rates, the opponent's rate allowed, the matchup (the engine's tier grades, copied), and a
+For one side of a leg it answers four questions in order (DECISIONS #249): where the line is and
+where the book puts 50/50; how he has done this season, which games were special and how he did
+without them; the matchup; and which of those facts point to the line being set high or low. It
+also states the workload that price needs (the bar), the rate needed at his recent workload, and a
 closing condition ("What needs to be true"; the text card asks it as a question). It gives NO
 chance of its own and never says whether a line is good.
 
@@ -266,24 +267,50 @@ Run it through `python nfl.py calc <command>` -- the same commands and arguments
    in seconds). An entry the user has settled on is one `entry --dry-run` (it prints every leg's
    card, but stops with "Not logged" and no cards if any leg falls short). A single `leg` run is
    for a single leg.
-3. **Show the chat card, in full and as printed** (the user's layout, 2026-10-11, DECISIONS #238).
+3. **Show the chat card, in full and as printed** (the user's layout, 2026-10-11, DECISIONS #238;
+   the four-part read, 2026-10-26, DECISIONS #249).
    Run `leg`, `game` and `entry` with `--format md`: the calculator prints each card as markdown
-   for chat -- the bet, its Reliability line (the bet type's test result, word for word), the
-   average workload needed, a workload table and a rate table, the last games and the season
-   count, the matchup, "What needs to be true", and where the quote came from. Paste it as
+   for chat, in four numbered parts that answer the user's four questions in order --
+   **1 · The line** (both prices, the book's split at this line with the margin removed -- the
+   book's numbers, never ours --, where the book's 50/50 sits and the workload the prices imply
+   (both our math; uneven prices put the 50/50 off the posted line), his workload and how often he went over or
+   under the line, both sides' bars), **2 · This season** (every game this season once he has 5,
+   else his last 4, each with what was special about it: left early, a teammate out or back, another
+   quarterback; the averages with and without those games; then the rate table), **3 · Matchup**
+   (the spread and total, every unit pairing, implied points, each team's scoring), and **4 · Does
+   it hold up** (the facts of parts 1-3 sorted into "points to the line being set high" and "set
+   low", not weighed) -- then "What needs to be true", and where the quote came from. Paste it as
    printed, as normal markdown, never inside a code block, with its own dividers; an entry
    prints its comparison table first, then the cards, then the fit check and the cost. Never
    recompute, round, re-sort or reword a number, a unit or the Reliability line. In a screen or a
    game read the matchup is printed ONCE per game, in the game header (the spread and total, all
-   four unit grades, each team's quarterback, the players Out, Doubtful or Questionable): keep it
-   exactly as printed and never repeat it on each card (the user, 2026-10-11). A single leg's card
-   carries its own **Matchup** table; keep that too. The one thing you add to a card is a
-   **Matchup read:** paragraph right before its "What needs to be true" line -- two
-   concrete sentences: whether his opportunities should rise, hold or fall (an injury from
-   `status --game`, a teammate out, the spread), and whether the defense or an injury supports or
-   challenges the assumed rate. Then your analysis around it, conditional on the user's view --
-   never a pick, a lean, an edge or a chance (an entry assembled under rule 7 is labelled by
-   its view, never as a pick). The text card (no `--format`) is for Claude Code.
+   four unit grades, implied points, each team's scoring, each team's quarterback, the players Out,
+   Doubtful or Questionable): keep it exactly as printed and never repeat it on each card (the user,
+   2026-10-11). A game read prints ONE card per player (the user, 2026-10-26, DECISIONS #249): his
+   lines side by side in **1 · The lines** (so catches against yards is two columns of one table),
+   this season once (a game is special only for what was different in it: he left early, a main
+   teammate missed it, a backup QB started; who is out today is its own "Out today" note), the rates,
+   and part 4 as a grid (a row per factor, a column per line, ▲ high / ▼ low / –) -- write one Risks
+   paragraph per player card, not one per line, and never add up the arrows. `leg`, `entry` and the screen's rows keep the
+   single-leg card, which carries its own **3 · Matchup** table; keep that too. The one thing you add to a card is a
+   **Risks:** paragraph right after part 4's lists, before "What needs to be true" (the user,
+   2026-10-26: "what are the risks that this could go against us"). It is required, and it goes
+   through this checklist, saying each item that applies in one concrete sentence from the card,
+   `status --game` or the official injury report (and "none found" for the checklist as a whole
+   only when none applies):
+   - a main teammate returning or newly out (part 2's special games, the injury report), and
+     whether his share could go to someone else instead of him (another back, the other receivers);
+   - a quarterback change, or a starter playing hurt;
+   - game script: the spread and implied points against how his workload has moved in wins and
+     losses (part 3);
+   - the sample: how many games each average rests on, and whether the season read is his last 4
+     because this season is short (part 2 says so);
+   - the market's test result (a leg card's Reliability line, word for word; a player card does not
+     print it -- the user dropped it -- so say it only when the user asks).
+   Part 4 sorts facts; it never says which side is right, and neither do you -- no pick, lean, edge
+   or chance (an entry assembled under rule 7 is labelled by its view, never as a pick). Your
+   analysis around a card is conditional on the user's view. The text card (no `--format`) is for
+   Claude Code.
 4. **Follow-ups** (named at the end of a batch): Workload (game values, season count, rounding,
    role-changing injuries), Calculation (how the price becomes a bar, the longer-run rate's blend
    toward the position average; the tuned settings and where each came from are the comments in
