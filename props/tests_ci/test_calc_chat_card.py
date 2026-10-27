@@ -132,13 +132,14 @@ def test_a_marked_game_and_the_short_history_reach_the_chat_card():
     pl = _player(season, window)
     c = card.compute(pl, rush_model(ypc=4.2), "rush_yds", 64.5, 1.8, 1.76, fixed)
     md, text = card.render_md(pl, c, "over", opp="TB"), card.render(pl, c, "over", opp="TB")
-    assert "Last 4: 12 · 12 · 19* · 19" in md and "Last 4: 12, 12, 19*, 19" in text
-    assert "* Week 3: played far fewer snaps than usual." in md.splitlines()
-    assert "* Week 3: B.Backup started at QB." in md.splitlines(), "two notes for one game: two bullets"
+    # the text card keeps the last-4 check's star and notes; the chat card's season table says what was
+    # different in each game, so its Last 4 line is the plain numbers (DECISIONS #249)
+    assert "Last 4: 12 · 12 · 19 · 19" in md and "Last 4: 12, 12, 19*, 19" in text
+    assert "B.Backup started at QB" not in md and "B.Backup started at QB" in text
     short = _player(season.iloc[:2], window.iloc[3:])                  # two games: weeks 3-4
     cs = card.compute(short, rush_model(ypc=4.2), "rush_yds", 64.5, 1.8, 1.76, fixed)
     smd = card.render_md(short, cs, "over", opp="TB")
-    assert "Last 2: 19* · 19" in smd and "Short history: 2 games." in smd
+    assert "Last 2: 19 · 19" in smd and "Short history: 2 games." in smd
     assert "| Workload |" not in smd and "no recent average yet" in smd
 
 

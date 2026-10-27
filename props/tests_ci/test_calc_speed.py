@@ -166,19 +166,22 @@ def test_cards_for_the_players_named_both_sides_and_a_missing_name_is_said(one_l
     _loads, built = one_load
     out = CLI.game(Namespace(matchup="la@sf", player=["Christian McCaffrey", "Nobody"], all=False, side="both",
                              season=2026, week=6))
-    # one player card per player, both sides on it (DECISIONS #249): no second build for the Under
-    assert "PLAYER Christian McCaffrey SF over/under others=0" in out and "PLAYER Puka Nacua" not in out
+    # the text format (Claude Code) keeps the 40-column leg cards, one per side
+    assert "CARD Christian McCaffrey rush_yds over" in out and "CARD Christian McCaffrey rush_yds under" in out
+    assert "CARD Puka Nacua" not in out and "PLAYER" not in out
     assert "No posted line in this game for: Nobody." in out
-    assert not any(side == "under" for *_, side in built), "the player card reads both sides from one build"
     one = CLI.game(Namespace(matchup="LA@SF", player=[], all=True, side="under", season=2026, week=6))
-    assert one.count("PLAYER ") == 2 and "PLAYER Puka Nacua LA under others=0" in one
-    assert "CARD Backup Back rush_yds over" in one, "a player with no line ready keeps the leg card that says why"
+    assert "Puka Nacua receiving yards under: card not built: no under quote" in one, \
+        "one side failing keeps the rest of the output"
+    md = CLI.game(Namespace(matchup="LA@SF", player=[], all=True, side="under", season=2026, week=6, format="md"))
+    assert md.count("PLAYER ") == 2 and "PLAYER Puka Nacua LA under others=0" in md, "chat: one card per player"
+    assert "**MD Backup Back rush_yds under**" in md, "a player with no line ready keeps the leg card that says why"
 
 
 def test_a_short_name_finds_the_player_and_a_failed_card_is_not_called_missing(one_load):
     out = CLI.game(Namespace(matchup="LA@SF", player=["C. McCaffrey", "Broken Guy"], all=False, side="over",
                              season=2026, week=6))
-    assert "PLAYER Christian McCaffrey SF over others=0" in out, "Sleeper's short form names him"
+    assert "CARD Christian McCaffrey rush_yds over" in out, "Sleeper's short form names him"
     assert "No card for Broken Guy: the summary row says why." in out
     assert "No posted line" not in out
 

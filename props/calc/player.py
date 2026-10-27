@@ -374,8 +374,8 @@ def lineup_marks(b: Bundle, last: pd.DataFrame, gsis: str, team: str, pos: str, 
     return [bool(r) for r in reasons], lines, flags
 
 
-def lineup_detail(b: Bundle, last: pd.DataFrame, gsis: str, team: str, pos: str, season: int, week: int,
-                  market: str | None = None) -> tuple[list[list[str]], list[str], list[str]]:
+def lineup_detail(b: Bundle, last: pd.DataFrame, gsis: str, team: str, pos: str, season: int,
+                  week: int) -> tuple[list[list[str]], list[str], list[str]]:
     """The lineup check (the user, 2026-10-13; DECISIONS #247): a last-4 game is marked when a main
     teammate's status in it differs from today's --
       a. he took no offensive snap in that game and is active today, or
@@ -386,9 +386,8 @@ def lineup_detail(b: Bundle, last: pd.DataFrame, gsis: str, team: str, pos: str,
     and not on injured reserve (RES on his latest roster listing); Questionable counts as active and
     is returned as a flag. Case a counts only a game he played for this team while the teammate was on
     its roster that week (a teammate who joined later, or the player's games for another team, are not
-    "out"). Before the priced week's report is published nobody is Out today. market: passed to
-    main_teammates (a back's receiving markets add the receivers; DECISIONS #249). Returns (the reasons
-    per row of `last` -- empty for an unchanged game --, the card's cause lines, the flags).
+    "out"). Before the priced week's report is published nobody is Out today. Returns (the reasons per
+    row of `last` -- empty for an unchanged game --, the card's cause lines, the flags).
     Display, the second average and the screen's gate only: no rate or bar reads it."""
     n = len(last)
     if not n:
@@ -415,7 +414,7 @@ def lineup_detail(b: Bundle, last: pd.DataFrame, gsis: str, team: str, pos: str,
         lines.append("Injury report not read: nobody counts as Out today.")
     elif not ("team" in wk_rep and bool((wk_rep["team"] == team).any())):
         lines.append("Injury report not yet published: nobody counts as Out today.")
-    for m in main_teammates(b, gsis, team, pos, season, week, market):
+    for m in main_teammates(b, gsis, team, pos, season, week):
         gone = today(m)
         if status.get(m) == "Questionable" and not gone:
             flags.append(f"{names_.get(m, m)} Questionable")

@@ -85,6 +85,27 @@ def test_part_four_is_one_grid_with_a_column_per_line():
     assert sum(x.startswith("| ") and x.split(" | ")[0][2:] in card.FACTORS for x in L) == len(card.FACTORS)
 
 
+def test_each_table_stars_its_own_lines_special_games():
+    """A receiver out is special for the back's catches, not his carries: the rushing table's Without *
+    row must match the rushing column of parts 1 and 4."""
+    items = _items()
+    rec = items[0]
+    rec["pl"] = __import__("copy").copy(rec["pl"])
+    rec["pl"].perf = rec["pl"].perf.assign(reasons=[[], [], ["Lead Back out"], ["Top WR out"]])
+    L = player_card.render_md(items, [], ["over"]).splitlines()
+    assert "| 4 | PHI | 19 | 62 | 3.3 | 65% |" in L, "not starred in the rushing table"
+    assert "| 4 * | PHI | 2 | 1 | 8 | 4.0 | 65% |" in L, "starred in the receiving table"
+    assert "- Week 4 *: Top WR out (receiving only)" in L
+    assert "| Without * (2) |  | 15.5 | 51.5 | 3.3 |  |" in L, "rushing still leaves out weeks 2 and 3 only"
+
+
+def test_short_keeps_the_longer_run_qualifier():
+    assert player_card._short("At his longer-run rate, he needs about 1 more target than his recent average.") == \
+        "at his longer-run rate, about 1 more target"
+    assert player_card._short("He needs about 8 more carries than his recent average, or 4 more yards a carry than "
+                              "his longer-run rate at his recent workload.") == "about 8 more carries, or 4 more yards a carry"
+
+
 def test_every_number_on_the_player_card_is_on_his_leg_cards():
     items = _items()
     md = player_card.render_md(items, [], ["over", "under"])

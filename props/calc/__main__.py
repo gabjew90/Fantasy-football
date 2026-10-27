@@ -779,8 +779,17 @@ def game(a) -> str:
         groups.setdefault((got["stub"]["team"], got["stub"]["player"]), []).append((p, got))
     for (_, who), legs in groups.items():
         ready = [got for _, got in legs if got.get("ready")]
-        if not ready:
-            L += gap + [got[key] for _, got in legs[:1]] + [got[key] for _, got in legs[1:]]
+        if not ready or key == "text":         # the text format (Claude Code) keeps the 40-column leg cards
+            for p, got in legs:
+                for side in sides:
+                    if side == "over":
+                        L += gap + [got[key]]
+                        continue
+                    try:
+                        L += gap + [build_card(b, got["stub"]["player"], p["market"], side, team=got["stub"]["team"],
+                                               season=season, week=wk, lookup=lookup)[key]]
+                    except (player.NotFound, DataError, SystemExit) as ex:
+                        L += gap + [f"{got['stub']['player']} {card.SHOW[p['market']][0]} {side}: card not built: {ex}"]
             continue
         others = [f"{card.SHOW[p['market']][0].capitalize()} {got['line']:g}: "
                   + ("not enough data, so no bar: " if got["not_enough"] else "") + got["reason"]

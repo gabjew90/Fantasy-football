@@ -73,7 +73,7 @@ def even_line(outcomes) -> float:
     each half-point line (0.5, 1.5, ...) is read and the line where it crosses one half is interpolated
     between the two half-points around it."""
     x = np.sort(np.asarray(outcomes, dtype=float))
-    h = np.arange(0.5, max(float(x[-1]), 0.0) + 1.5)
+    h = np.arange(np.floor(float(x[0])) - 0.5, float(x[-1]) + 1.5)    # from below his lowest game
     over = 1.0 - np.searchsorted(x, h, side="right") / len(x)      # share above each half-point
     i = int(np.argmax(over < 0.5))
     if over[i] >= 0.5:                         # never below a half (cannot happen past the maximum)
@@ -977,16 +977,13 @@ def render_md(pl: Player, c: dict, side: str, *, opp: str, game_lines: dict | No
     hist = []
     if rows:
         tabled = c["usual"] is not None and P["bar"] is not None
-        avg = (f" (average {d1(c['usual'])}{_without(rows)})" if c["usual"] is not None and not tabled
-               else (f" ({_without(rows)[2:]})" if c["usual"] is not None and P["marked"] else ""))
-        hist.append(f"Last {len(rows)}: {_md_last(rows)}{avg}"
+        avg = f" (average {d1(c['usual'])})" if c["usual"] is not None and not tabled else ""
+        hist.append(f"Last {len(rows)}: {' · '.join(str(w) for w, _, _ in rows)}{avg}"
                     + (" (back into last season)" if c.get("usual_spans_seasons") else ""))
     else:
         hist.append(f"No games before week {pl.week}.")
     if 0 < len(rows) < P["n"]:
         hist.append(f"Short history: {len(rows)} games.")
-    elif c["usual"] is not None and P["n_clean"] < 3:
-        hist.append(f"Short history: {P['n_clean']} game{'' if P['n_clean'] == 1 else 's'} without a lineup change.")
     if P["bar"] is not None:
         if P["season"] is not None:
             n, hit, of = P["season"]
@@ -999,7 +996,10 @@ def render_md(pl: Player, c: dict, side: str, *, opp: str, game_lines: dict | No
     for x in hist:                             # a paragraph each: a copied reply keeps them apart
         out += [x, ""]
     out.pop()
-    notes = _md_notes(rows, pl.season) + list(pl.lineup) + [x for x in " ".join(_no_depth(pl, m)).split("\n") if x]
+    # the last-4 check's stars and cause lines are the screen's (DECISIONS #247); on the chat card the season
+    # table says what was different in each game, so only the report notice and the depth note stay
+    notes = [x for x in pl.lineup if x.startswith("Injury report")] + \
+        [x for x in " ".join(_no_depth(pl, m)).split("\n") if x]
     if notes:
         out += [""] + [f"* {x}" for x in notes]
     out.append("")

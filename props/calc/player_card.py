@@ -24,6 +24,7 @@ RATE = {"rush": ("Yds/carry", "rush_yds", "carries", "yards a carry"),
 WORDS = {"rush": ("carries", "rushing yards"), "rec": ("targets", "catches", "receiving yards"),
          "pass": ("completions", "passing yards")}
 CY_NOTE = "Yards can come from one long catch; catches cannot (a general point)."
+NAME = {"rush": "Rushing", "rec": "Receiving", "pass": "Passing"}
 
 
 def _label(c: dict) -> str:
@@ -97,35 +98,38 @@ def season_part(items: list[dict]) -> tuple[str, list[str]]:
     perf = g0["pl"].perf.reset_index(drop=True)
     season = g0["pl"].season
     groups = [x for x in ("rush", "rec", "pass") if any(GROUP[g["c"]["market"]] == x for g, _ in reads)]
-    weeks, special, notes = [], [], []
+    # each table stars the games its own lines count as special (a receiver out is special for his
+    # catches, not his carries), so a table's "Without *" row matches its lines' parts 1 and 4
+    gread = {x: next(S for g, S in reads if GROUP[g["c"]["market"]] == x) for x in groups}
+    weeks, notes = [], []
+    special = {x: [gread[x]["rows"][i]["special"] for i in range(len(perf))] for x in groups}
     for i, (_, r) in enumerate(perf.iterrows()):
-        sp, why = False, []
-        for _, S in reads:
-            row = S["rows"][i]
-            sp = sp or row["special"]
-            why += [n for n in row["notes"] if n not in why]
+        why = []
+        for x in groups:
+            why += [n for n in gread[x]["rows"][i]["notes"] if n not in why]
         wk = f"Week {int(r['week'])}" if int(r["season"]) == season else f"{int(r['season'])} week {int(r['week'])}"
         weeks.append(wk)
-        special.append(sp)
+        starred = [x for x in groups if special[x][i]]
         if why:
-            notes.append(f"{wk}{' *' if sp else ''}: {'; '.join(why)}")
+            only = (f" ({' and '.join(NAME[x].lower() for x in starred)} only)"
+                    if starred and len(starred) < len(groups) else "")
+            notes.append(f"{wk}{' *' if starred else ''}: {'; '.join(why)}{only}")
     out = []
     if S0["scope"] != "season":
         k = S0["n_season"]
         out += [f"Only {k} game{'' if k == 1 else 's'} this season, so these are his last {S0['all']['n']}"
                 + (", back into last season." if S0["spans_seasons"] else "."), ""]
-    name = {"rush": "Rushing", "rec": "Receiving", "pass": "Passing"}
     for x in groups:
         head = ["Week", "Opp"] + [h for h, _ in COLS[x]] + [RATE[x][0], "Snaps"]
-        out += [name[x], "", _row(head), "|" + "---|" * len(head)]
+        out += [NAME[x], "", _row(head), "|" + "---|" * len(head)]
         for i, (_, r) in enumerate(perf.iterrows()):
             _, stat, work, _ = RATE[x]
             snap = r.get("snap_pct")
-            out.append(_row([weeks[i].removeprefix("Week ") + (" *" if special[i] else ""), r.get("opp") or "-"]
+            out.append(_row([weeks[i].removeprefix("Week ") + (" *" if special[x][i] else ""), r.get("opp") or "-"]
                             + [C._num(float(r[col])) for _, col in COLS[x]]
                             + [C.d1(float(r[stat]) / float(r[work])) if float(r[work]) else "-",
                                f"{C.half_up(float(snap) * 100, '1'):.0f}%" if snap is not None and snap == snap else "-"]))
-        out += _average_rows(x, perf, special) + [""]
+        out += _average_rows(x, perf, special[x]) + [""]
     if notes:
         out += ["What was different (* = left out of the second average):", ""] + [f"- {n}" for n in notes] + [""]
     today = []
@@ -198,7 +202,7 @@ def _short(cond: str) -> str:
     cond = cond.replace("His recent workload and rate both meet the bar.", "met")
     cond = cond.replace("His recent workload meets the bar.", "met")
     cond = cond.replace("His recent workload is there; he needs ", "workload met; needs ")
-    cond = cond.replace("At his longer-run rate, he needs ", "")
+    cond = cond.replace("At his longer-run rate, he needs ", "at his longer-run rate, ")
     return cond.rstrip(".")
 
 

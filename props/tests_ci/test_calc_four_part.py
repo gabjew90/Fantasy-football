@@ -171,7 +171,7 @@ def test_lineup_detail_gives_each_game_its_reason_and_lineup_marks_keeps_its_sha
                          "backup_qb": [False, False, False, True], "qb_started": [None, None, None, "B.Backup"]})
     monkeypatch.setattr(player, "main_teammates", lambda *a: ["00-0000002"])
     monkeypatch.setattr(player, "current_starter", lambda *a: "00-0000009")
-    reasons, lines_, _ = player.lineup_detail(b, last, "00-0000001", "LA", "WR", 2026, 5, "rec_yds")
+    reasons, lines_, _ = player.lineup_detail(b, last, "00-0000001", "LA", "WR", 2026, 5)
     assert reasons == [[], ["Puka Nacua out"], ["Puka Nacua out"], ["B.Backup started at QB"]]
     marks, lines2, _ = player.lineup_marks(b, last, "00-0000001", "LA", "WR", 2026, 5)
     assert marks == [False, True, True, True] and lines2 == lines_
@@ -227,7 +227,10 @@ def test_the_even_line_interpolates_between_half_points():
     outs = [0] * 15 + [1] * 43 + [2] * 42
     assert card.even_line(outs) == pytest.approx(0.5 + 0.35 / 0.43)
     assert card.even_line([1] * 49 + [2] * 51) == pytest.approx(1.5 + 0.01 / 0.51), "51% over 1.5"
-    assert card.even_line([0] * 70 + [3] * 30) == 0.5, "under a half over the first half-point"
+    # most games at or below zero: the even point is read below 0.5, never clamped to it
+    # 60% at -2, 40% at 3: over -2.5 is 100%, over -1.5 is 40% -> -2.5 + 0.5 / 0.6
+    assert card.even_line([-2] * 60 + [3] * 40) == pytest.approx(-2.5 + 0.5 / 0.6)
+    assert card.even_line([0] * 70 + [3] * 30) < 0.5, "under a half go over 0.5: the even point is below it"
 
 
 def test_uneven_prices_move_the_books_50_50_off_the_line():
