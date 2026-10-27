@@ -103,6 +103,8 @@ def season_part(items: list[dict]) -> tuple[str, list[str]]:
     gread = {x: next(S for g, S in reads if GROUP[g["c"]["market"]] == x) for x in groups}
     weeks, notes = [], []
     special = {x: [gread[x]["rows"][i]["special"] for i in range(len(perf))] for x in groups}
+    like = {x: [gread[x]["rows"][i]["like"] for i in range(len(perf))] if gread[x]["tonight"] else None
+            for x in groups}
     for i, (_, r) in enumerate(perf.iterrows()):
         why = []
         for x in groups:
@@ -129,9 +131,10 @@ def season_part(items: list[dict]) -> tuple[str, list[str]]:
                             + [C._num(float(r[col])) for _, col in COLS[x]]
                             + [C.d1(float(r[stat]) / float(r[work])) if float(r[work]) else "-",
                                f"{C.half_up(float(snap) * 100, '1'):.0f}%" if snap is not None and snap == snap else "-"]))
-        out += _average_rows(x, perf, special[x]) + [""]
+        out += _average_rows(x, perf, special[x], like[x], weeks) + [""]
     if notes:
-        out += ["What was different (* = left out of the second average):", ""] + [f"- {n}" for n in notes] + [""]
+        modes = {like[x] is not None for x in groups}
+        out += [C.notes_head(modes.pop() if len(modes) == 1 else None), ""] + [f"- {n}" for n in notes] + [""]
     today = []
     for g, _ in reads:
         today += [x for x in g["pl"].today if x not in today]
@@ -141,8 +144,10 @@ def season_part(items: list[dict]) -> tuple[str, list[str]]:
     return title, out
 
 
-def _average_rows(group: str, perf, special: list[bool]) -> list[str]:
-    """The table's last rows: his average over every game, and without the starred ones."""
+def _average_rows(group: str, perf, special: list[bool], like: list[bool] | None = None,
+                  weeks: list[str] | None = None) -> list[str]:
+    """The table's last rows: his average over every game, and the second average -- the games like
+    tonight when some share an absence with tonight's (like), else the games without a star."""
     p = perf.reset_index(drop=True)
     _, stat, work, _ = RATE[group]
 
@@ -151,6 +156,12 @@ def _average_rows(group: str, perf, special: list[bool]) -> list[str]:
         return _row([label, ""] + [C.d1(float(rows[col].sum()) / n) for _, col in COLS[group]]
                     + [C.d1(float(rows[stat].sum()) / tot) if tot else "-", ""])
     out = [row(f"Average ({len(p)})", p)]
+    if like is not None:
+        if any(like):
+            wk = [w.removeprefix("Week ") for w, x in zip(weeks or [], like) if x]
+            label = f"Like tonight, wk {', '.join(wk)}" if wk else "Like tonight"
+            out.append(row(f"{label} ({sum(like)})", p[like]))
+        return out
     keep = [not x for x in special]
     if any(special) and any(keep):
         out.append(row(f"Without * ({sum(keep)})", p[keep]))

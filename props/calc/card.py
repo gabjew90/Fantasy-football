@@ -458,8 +458,10 @@ def _agg(rows: list[dict], k: float) -> dict | None:
 
 def season_read(pl: Player, c: dict) -> dict | None:
     """Part 2's numbers: one row per game of pl.perf (this season's games, or his last games when this
-    season has too few) with what was special about it, the averages with and without the special games,
-    and how often he went over and under the line. Special: left early (fewer snaps and listed for the
+    season has too few) with what was special about it, his average over them all and over a second set
+    -- the games like tonight when some share an absence with tonight's (pl.tonight, DECISIONS #251), else
+    the games with nothing special ("clean" keys hold that second set either way) -- and how often he
+    went over and under the line. Special: left early (fewer snaps and listed for the
     next game), a lineup change (lineup_detail's reasons), or -- on a quarterback's card -- a game he did
     not start. None with no games."""
     g = pl.perf
@@ -476,16 +478,22 @@ def season_read(pl: Player, c: dict) -> dict | None:
         if pl.position == "QB" and isinstance(q, str) and q and q != pl.gsis_id:
             notes.append("did not start")
         special = bool(notes)
+        like = (bool(r.get("like_tonight", False)) and not bool(r.get("left_early", False))
+                and "did not start" not in notes)
         if bool(r.get("fewer_snaps", False)) and not bool(r.get("left_early", False)):
             notes.append("far fewer snaps, no injury listing")
         snap = r.get("snap_pct")
         rows.append({"season": int(r["season"]), "week": int(r["week"]), "opp": r.get("opp") or "",
                      "work": int(r[wcol]), "stat": float(r[scol]),
                      "snap": float(snap) if snap is not None and pd.notna(snap) else None,
-                     "notes": notes, "special": special})
-    clean = [r for r in rows if not r["special"]]
+                     "notes": notes, "special": special, "like": like})
+    # the second set: the games like tonight when some share an absence with tonight's (game_conditions),
+    # else the games with nothing special in them
+    tonight = bool(getattr(pl, "tonight", False))
+    clean = [r for r in rows if r["like"]] if tonight else [r for r in rows if not r["special"]]
     line = c["line"]
     return {"scope": pl.perf_scope, "rows": rows, "all": _agg(rows, k), "clean": _agg(clean, k),
+            "tonight": tonight, "like_weeks": [_wk(r, pl.season) for r in clean] if tonight else [],
             "special_weeks": [_wk(r, pl.season) for r in rows if r["special"]],
             "over": sum(r["stat"] > line for r in rows), "under": sum(r["stat"] < line for r in rows),
             "over_clean": sum(r["stat"] > line for r in clean), "under_clean": sum(r["stat"] < line for r in clean),
@@ -509,7 +517,20 @@ def _weeks(ws: list[str]) -> str:
 
 
 def _without_special(S: dict) -> str:
+    """What the second set is: 'without weeks 2 and 3', or 'in games like tonight (weeks 5 and 6)'."""
+    if S.get("tonight"):
+        return f"in games like tonight ({_weeks(S['like_weeks'])})" if S["like_weeks"] else "in games like tonight"
     return f"without {_weeks(S['special_weeks'])}"
+
+
+def notes_head(tonight: bool | None) -> str:
+    """The heading over the list of what was different. With games like tonight the second average keeps
+    some starred games, so the star cannot mean 'left out'; None when the tables differ (one in each
+    mode), and each table's own second-average label says which it is."""
+    if tonight is None:
+        return "What was different (*):"
+    return ("What was different (*; the second average is the games like tonight):" if tonight
+            else "What was different (* = left out of the second average):")
 
 
 def _of(S: dict, x: int, n: int) -> str:
@@ -556,7 +577,8 @@ def line_part(pl: Player, c: dict, side: str) -> list[tuple[str, str]]:
         a, cl = S["all"], S["clean"]
         work = f"{d1(a['work'])} a game"
         if S["special_weeks"]:
-            work += f"; {d1(cl['work'])} {_without_special(S)}" if cl else "; every game was special"
+            work += (f"; {d1(cl['work'])} {_without_special(S)}" if cl else
+                     "; no game like tonight without another change" if S["tonight"] else "; every game was special")
         rows.append((f"His {many} {_scope(S)}", work))
         word = "Over" if side == "over" else "Under"
         x, xc = S[side], S[f"{side}_clean"]
@@ -595,8 +617,12 @@ def season_lines(c: dict, S: dict) -> list[str]:
         return f"{d1(a['work'])} {many}, {d1(a['stat'])} {bet}{rate} ({a['n']} games)"
     out = [f"Average {_scope(S)}: {avg(S['all'])}."]
     if S["special_weeks"]:
-        out.append(f"Average {_without_special(S)} (the special games): {avg(S['clean'])}." if S["clean"]
-                   else "Every game had something special; no second average.")
+        if S["tonight"]:
+            out.append(f"Average {_without_special(S)}: {avg(S['clean'])}." if S["clean"]
+                       else "Every game like tonight also had another change; no second average.")
+        else:
+            out.append(f"Average {_without_special(S)} (the special games): {avg(S['clean'])}." if S["clean"]
+                       else "Every game had something special; no second average.")
     if S["scope"] != "season":
         k = S["n_season"]
         out.append(f"Only {k} game{'' if k == 1 else 's'} this season, so this is his last {S['all']['n']}"
@@ -609,7 +635,7 @@ def team_points_text(team: str, sc) -> str:
     return f"{d1(pf)} scored, {d1(pa)} allowed a game ({n} games)"
 
 
-FACTORS = ["Games over the line", "Without the special games", "His average vs the line",
+FACTORS = ["Games over the line", "Games like tonight", "His average vs the line",
            "Workload the prices imply vs his average", "Opponent's rate vs his longer-run rate", "Unit matchup",
            "Implied points vs his team's scoring", "Game script"]
 MARK = {"high": "▲ high", "low": "▼ low"}
@@ -639,16 +665,19 @@ def holds_up(pl: Player, c: dict, side: str, *, opp: str, game_lines: dict | Non
         rows["Games over the line"] = (None if S["over"] * 2 == n else ("low" if S["over"] * 2 > n else "high"),
                                        f"{S['over']} of {n}")
         if not S["special_weeks"]:
-            rows["Without the special games"] = (None, "no special games")
+            rows["Games like tonight"] = (None, "all of them: nothing was different")
         elif not cl:
-            rows["Without the special games"] = (None, "every game was special")
+            rows["Games like tonight"] = (None, "none: each also had another change" if S["tonight"]
+                                          else "every game was special")
         else:
             k = cl["n"]
-            rows["Without the special games"] = (None if S["over_clean"] * 2 == k else
-                                                 ("low" if S["over_clean"] * 2 > k else "high"),
-                                                 f"{S['over_clean']} of {k}")
+            rows["Games like tonight"] = (None if S["over_clean"] * 2 == k else
+                                          ("low" if S["over_clean"] * 2 > k else "high"),
+                                          f"{S['over_clean']} of {k} " + (f"({_weeks(S['like_weeks'])})" if S["tonight"]
+                                                                          else _without_special(S)))
         use = cl if S["special_weeks"] and cl else a
-        tag = " without them" if use is cl and S["special_weeks"] else (", all special" if S["special_weeks"] else "")
+        tag = ((" in games like tonight" if S["tonight"] else " without them") if use is cl and S["special_weeks"]
+               else ", none like tonight" if S["tonight"] else (", all special" if S["special_weeks"] else ""))
         rows["His average vs the line"] = (_toward(half_up(use["stat"], "0.1"), line),
                                            f"{d1(use['stat'])} vs {line:g}{tag}")
         bw = value(c, "book_expects")
@@ -993,7 +1022,7 @@ def render_md(pl: Player, c: dict, side: str, *, opp: str, game_lines: dict | No
                  + (" *" if cells[6].startswith("SPECIAL") else "") + ": " + cells[6].removeprefix("SPECIAL: ")
                  for cells in body if cells[6] != "-"]
         if notes:
-            out += ["What was different (* = left out of the second average):", ""] + [f"- {n}" for n in notes] + [""]
+            out += [notes_head(S["tonight"]), ""] + [f"- {n}" for n in notes] + [""]
         for x in season_lines(c, S):
             out += [x, ""]
     hist = []

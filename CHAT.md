@@ -289,7 +289,8 @@ Run it through `python nfl.py calc <command>` -- the same commands and arguments
    2026-10-11). A game read prints ONE card per player (the user, 2026-10-26, DECISIONS #249): his
    lines side by side in **1 · The lines** (so catches against yards is two columns of one table),
    this season once (a game is special only for what was different in it: he left early, a main
-   teammate missed it, a backup QB started; who is out today is its own "Out today" note), the rates,
+   teammate missed it, a backup QB started; who is out today is its own "Out today" note; when tonight's
+   absence happened before, the second average is the games like tonight, DECISIONS #251), the rates,
    and part 4 as a grid (a row per factor, a column per line, ▲ high / ▼ low / –) -- write one Risks
    paragraph per player card, not one per line, and never add up the arrows. `leg`, `entry` and the screen's rows keep the
    single-leg card, which carries its own **3 · Matchup** table; keep that too. The one thing you add to a card is a

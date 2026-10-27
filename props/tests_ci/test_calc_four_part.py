@@ -188,7 +188,7 @@ def test_part_four_is_a_grid_of_every_factor_with_its_direction():
     g = _grid(pl, c)
     assert list(g) == card.FACTORS, "the same rows on every card"
     assert g["Games over the line"] == ("high", "1 of 4")
-    assert g["Without the special games"] == ("high", "0 of 2")
+    assert g["Games like tonight"] == ("high", "0 of 2 without weeks 2 and 3")
     assert g["His average vs the line"] == ("high", "51.5 vs 64.5 without them")
     assert g["Opponent's rate vs his longer-run rate"] == ("low", "4.4 vs 4.2 yards a carry")
     assert g["Unit matchup"] == ("low", "run offense B vs defense C")
@@ -261,7 +261,7 @@ def test_every_game_special_is_said_in_part_four():
     pl, c, _ = _card()
     pl.perf["reasons"] = [["X out"]] * 4
     g = _grid(pl, c, game_lines=None, opp_row=None, grades=None, scoring=None)
-    assert g["Without the special games"] == (None, "every game was special")
+    assert g["Games like tonight"] == (None, "every game was special")
     assert g["His average vs the line"] == ("high", "57.8 vs 64.5, all special")
 
 
@@ -286,16 +286,18 @@ def test_game_conditions_mark_a_game_only_for_what_was_different_in_it(monkeypat
                          "qb_name": ["J.Hurts", "J.Hurts", "J.Hurts", "T.McKee"]})
     monkeypatch.setattr(player, "main_teammates", lambda *a: ["wr1"])
     monkeypatch.setattr(player, "regular_qb", lambda *a: "qb1")
-    reasons, today = player.game_conditions(b, rows, "rb1", "PHI", "RB", 2026, 5, "receptions")
+    reasons, today, like = player.game_conditions(b, rows, "rb1", "PHI", "RB", 2026, 5, "receptions")
     # Smith played weeks 1, 2, 4 and is Out today: only week 3 (he did not play) is special for him; Hurts
     # started weeks 1-3 and is Out today: only week 4 (McKee started) is special for the quarterback
     assert reasons == [[], [], ["DeVonta Smith out"], ["T.McKee started at QB"]]
     assert today == ["DeVonta Smith is Out; he missed 1 of these 4 games (week 3).",
                      "Jalen Hurts (QB) is Out; another quarterback started 1 of these 4 games (week 4)."]
+    # each absence in weeks 3 and 4 is one of tonight's: those two are the games like tonight
+    assert like == [False, False, True, True]
     # Marquise Brown's card: three games for KC last season, one for PHI -- the KC games say so, and today's
     # lines count his PHI game only
     kc = rows.assign(team=["KC", "KC", "KC", "PHI"], qb_id=["m", "m", "m", "qb1"], season=[2025, 2025, 2025, 2026])
-    reasons, today = player.game_conditions(b, kc, "rb1", "PHI", "WR", 2026, 5)
+    reasons, today, like = player.game_conditions(b, kc, "rb1", "PHI", "WR", 2026, 5)
     assert reasons[:3] == [["played for KC"]] * 3
     assert today[-1] == "Jalen Hurts (QB) is Out; he started it (his 1 game for PHI)."
 
@@ -357,3 +359,66 @@ def test_both_cards_print_the_four_parts_and_the_same_numbers():
     assert not (nums(md.split("What needs to be true:")[0]) - nums(text) - {"4"})
     for banned in ("bet", "lean", "pick", "recommend", "likely", "lock"):
         assert not re.search(rf"\b{banned}\b", md.lower()), banned
+
+
+def test_games_like_tonight_keep_only_the_games_whose_absences_are_all_tonights(monkeypatch):
+    """The user, 2026-10-27, after Makai Lemon's 7 catches with DeVonta Smith out: when tonight's absence
+    happened before, those games are the comparison. A game with a different absence too (Goedert out
+    then, playing tonight) is not like tonight; nor is a game with nobody out."""
+    from props.calc import player
+    ros = pd.DataFrame([{"season": 2026, "week": w, "team": "PHI", "gsis_id": g, "full_name": n, "status": "ACT"}
+                        for w in (1, 2, 3, 4) for g, n in (("wr1", "DeVonta Smith"), ("te1", "Dallas Goedert"))])
+    # Smith: no snap weeks 2 and 3; Goedert: no snap week 3
+    share = pd.DataFrame({"game_id": ["g1", "g4", "g1", "g2", "g4"], "gsis_id": ["wr1", "wr1", "te1", "te1", "te1"]})
+    rep = pd.DataFrame([{"season": 2026, "week": 5, "team": "PHI", "gsis_id": "wr1", "report_status": "Out"}])
+    b = type("B", (), {"rosters": ros, "snap_share": share, "schedule": None, "injury_report": lambda self, s: rep})()
+    rows = pd.DataFrame({"season": [2026] * 4, "week": [1, 2, 3, 4], "game_id": ["g1", "g2", "g3", "g4"],
+                         "team": ["PHI"] * 4})
+    monkeypatch.setattr(player, "main_teammates", lambda *a: ["wr1", "te1"])
+    monkeypatch.setattr(player, "regular_qb", lambda *a: None)
+    reasons, _, like = player.game_conditions(b, rows, "wr9", "PHI", "WR", 2026, 5, "receptions")
+    assert reasons == [[], ["DeVonta Smith out"], ["DeVonta Smith out", "Dallas Goedert out"], []]
+    assert like == [False, True, False, False]
+    # nobody out tonight: no game is like tonight by absence, and the read keeps the games without a star
+    none_out = type("B", (), {"rosters": ros, "snap_share": share, "schedule": None,
+                              "injury_report": lambda self, s: rep.iloc[0:0]})()
+    assert player.game_conditions(b=none_out, rows=rows, gsis="wr9", team="PHI", pos="WR", season=2026, week=5,
+                                  market="receptions")[2] is None
+
+
+def test_the_season_read_and_part_four_compare_with_the_games_like_tonight():
+    pl, c, _ = _card()
+    # weeks 3 and 4 share tonight's absence; week 2 left early, so it is never a game like tonight
+    pl.perf["reasons"] = [[], ["X out"], ["X out"], ["X out"]]
+    pl.perf["like_tonight"] = [False, True, True, True]
+    pl.tonight = True
+    S = card.season_read(pl, c)
+    assert [r["like"] for r in S["rows"]] == [False, False, True, True]
+    assert S["like_weeks"] == ["week 3", "week 4"]
+    # weeks 3 and 4: 98 and 62 yards on 19 carries each (the _games fixture)
+    assert S["clean"]["stat"] == pytest.approx(80.0) and S["clean"]["work"] == pytest.approx(19.0)
+    assert (S["over_clean"], S["under_clean"]) == (1, 1)
+    rows = dict(card.line_part(pl, c, "over"))
+    assert rows["His carries in his last 4 games"] == "15.5 a game; 19.0 in games like tonight (weeks 3 and 4)"
+    assert rows["Over 64.5"] == "1 of his last 4 games; 1 of 2 in games like tonight (weeks 3 and 4)"
+    g = _grid(pl, c)
+    assert g["Games like tonight"] == (None, "1 of 2 (weeks 3 and 4)")
+    assert g["His average vs the line"] == ("low", "80.0 vs 64.5 in games like tonight")
+    assert card.season_lines(c, S)[1] == ("Average in games like tonight (weeks 3 and 4): 19.0 carries, "
+                                          "80.0 rushing yards, 4.2 yards a carry (2 games).")
+    assert card.notes_head(True).startswith("What was different (*; the second average is the games like tonight")
+
+
+def test_with_no_game_like_tonight_the_card_does_not_say_every_game_was_special():
+    """Review of #251: tonight's absence happened before, but each such game had another change too,
+    and other games had nothing special -- the card must not claim every game was special."""
+    pl, c, _ = _card()
+    pl.perf["reasons"] = [[], [], ["X out", "Y out"], []]
+    pl.perf["like_tonight"] = [False] * 4
+    pl.tonight = True
+    rows = dict(card.line_part(pl, c, "over"))
+    assert rows["His carries in his last 4 games"] == "15.5 a game; no game like tonight without another change"
+    g = _grid(pl, c)
+    assert g["Games like tonight"] == (None, "none: each also had another change")
+    assert g["His average vs the line"][1] == "57.8 vs 64.5, none like tonight"
+    assert card.notes_head(None) == "What was different (*):"
