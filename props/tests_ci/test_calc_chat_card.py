@@ -51,7 +51,7 @@ def test_the_chat_card_follows_the_users_layout():
                               "| TB run defense | C |", "| Spread and total | Dallas favored by 9.5. Total 49.5. |"]
     assert any(x.startswith("What needs to be true: ") for x in L) and "?" not in md
     assert L[-1] == "_Line as of Oct 8, 4:59 PM PT._"
-    # "~" only on workloads: the bar, the other side's bar and the workload at the book's split
+    # "~" only on workloads: the bar, the other side's bar and the workload the prices imply
     book, under = card._round(card.value(c, "book_expects")), card._round(card.value(c, "needed_under"))
     assert "```" not in md and "~" not in md.replace(f"~{bar}", "").replace(f"~{book}", "").replace(f"~{under}", "")
     # bold only on what the bet needs: the bar (heading and cell) and the needed rate

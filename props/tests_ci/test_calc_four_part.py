@@ -51,9 +51,11 @@ def test_part_one_prints_the_books_split_and_both_bars():
     pl, c, kw = _card()
     rows = dict(card.line_part(pl, c, "over"))
     # -125 -> 55.6%, -132 -> 56.9%; margin removed: 55.6 / (55.6 + 56.9) = 49.4%
-    assert rows["The book's 50/50, margin removed"] == "Over 49% / Under 51% (the book's numbers)"
+    assert rows["The book's split at this line, margin removed"] == "Over 49% / Under 51% (the book's numbers)"
+    # near-even prices: the book's 50/50 sits within a point of the posted line
+    assert abs(c["line_50"] - 64.5) <= 1.0 and rows["Where the book's 50/50 sits (our math)"].endswith("rushing yards")
     assert rows["Line"] == "64.5 rushing yards, Over -125 / Under -132"
-    assert rows["Workload at the book's split (our math)"] == f"~{card._round(card.value(c, 'book_expects'))} carries"
+    assert rows["Workload the prices imply (our math)"] == f"~{card._round(card.value(c, 'book_expects'))} carries"
     assert rows["His carries in his last 4 games"] == "15.5 a game; 15.5 without weeks 2 and 3"
     assert rows["Over 64.5"] == "1 of his last 4 games; 0 of 2 without weeks 2 and 3"
     assert rows["Under needs at its price (-132)"].endswith("carries or fewer")
@@ -122,6 +124,20 @@ def test_left_early_needs_fewer_snaps_and_a_listing_for_the_next_game():
     assert not player.left_early(mine, none_yet)["left_early"].any(), "no report and no roster listing: not marked"
 
 
+def test_a_seasons_only_game_is_read_against_last_season_for_leaving_early():
+    """Marquise Brown, 2026: 22% of snaps in week 2, his only game, then Out with an ankle in week 3."""
+    hist = pd.DataFrame({"season": [2025, 2025, 2025, 2026], "week": [16, 17, 18, 2],
+                         "snap_pct": [0.53, 0.60, 0.81, 0.22]})
+    mine = pd.DataFrame({"season": [2026], "week": [2], "team": ["DAL"], "gsis_id": ["p"], "snap_pct": [0.22],
+                         "fewer_snaps": [False]})
+    b = _bundle([(2026, 3, "p", "Out")], [])
+    out = player.left_early(mine, b, hist, 0.5)
+    assert out["left_early"].tolist() == [True] and out["hurt_next"].tolist() == ["Out"]
+    assert not player.left_early(mine, b)["left_early"].any(), "without his history there is nothing to compare"
+    steady = mine.assign(snap_pct=[0.40])                      # 0.40 is not under half of last season's 0.65
+    assert not player.left_early(steady, b, hist.assign(snap_pct=[0.53, 0.60, 0.81, 0.40]), 0.5)["left_early"].any()
+
+
 def test_a_quarterbacks_own_starts_are_never_backup_games():
     sched = pd.DataFrame([dict(game_id=f"2026_0{w}_TB_X", season=2026, week=w, home_team="X", away_team="TB",
                                home_qb_id="x", away_qb_id=q) for w, q in ((1, "baker"), (2, "baker"), (3, "teddy"))])
@@ -161,52 +177,89 @@ def test_lineup_detail_gives_each_game_its_reason_and_lineup_marks_keeps_its_sha
     assert marks == [False, True, True, True] and lines2 == lines_
 
 
-def test_part_four_sorts_the_facts_by_direction():
-    pl, c, kw = _card()
-    high, low = card.holds_up(pl, c, "over", opp="TB", game_lines=GL, opp_row=OPP, grades=kw["grades"],
-                              qb_today="", scoring=SCORING, fixed_spread=3.0)
-    assert high[0] == "He went over 64.5 in 1 of his last 4 games."
-    assert "He averaged 51.5 rushing yards in his last 4 games without weeks 2 and 3, against a 64.5 line." in high
-    assert low == ["Tampa Bay has allowed 4.4 yards a carry to RBs; his longer-run rate is 4.2.",
-                   "DAL run offense B vs TB run defense C.", "DAL is implied 29.5 points; it has scored 27.3 a game.",
-                   "DAL is favored by 9.5: teams ahead tend to run more (a general tendency, not his own history)."]
-    dog_high, _ = card.holds_up(pl, c, "over", opp="TB", game_lines={**GL, "favorite": "TB"}, opp_row=None,
-                                grades=None, qb_today="", scoring=None, fixed_spread=3.0)
-    assert "DAL is a 9.5-point underdog: teams behind tend to run less (a general tendency, not his own history)." \
-        in dog_high
-    # the same side either way: the facts are about the line, not a side
-    assert card.holds_up(pl, c, "under", opp="TB", game_lines=GL, opp_row=OPP, grades=kw["grades"], qb_today="",
-                         scoring=SCORING, fixed_spread=3.0) == (high, low)
-    # a grade earned with a quarterback who is out is not a fact; a spread under the threshold is not script
-    _, low2 = card.holds_up(pl, c, "over", opp="TB", game_lines={**GL, "points": 2.5}, opp_row=OPP,
-                            grades=kw["grades"], qb_today="Dak Prescott ruled Out.", scoring=SCORING, fixed_spread=3.0)
-    assert not any("offense B" in x or "favored" in x for x in low2)
+def _grid(pl, c, **kw):
+    args = dict(opp="TB", game_lines=GL, opp_row=OPP, grades={"off": "B", "def": "C"}, qb_today="",
+                scoring=SCORING, fixed_spread=3.0)
+    return {f: (d, ev) for f, d, ev in card.holds_up(pl, c, "over", **{**args, **kw})}
 
 
-def test_a_passing_card_reads_the_underdog_as_throwing_more():
-    pl, c, kw = _card()
+def test_part_four_is_a_grid_of_every_factor_with_its_direction():
+    pl, c, _ = _card()
+    g = _grid(pl, c)
+    assert list(g) == card.FACTORS, "the same rows on every card"
+    assert g["Games over the line"] == ("high", "1 of 4")
+    assert g["Without the special games"] == ("high", "0 of 2")
+    assert g["His average vs the line"] == ("high", "51.5 vs 64.5 without them")
+    assert g["Opponent's rate vs his longer-run rate"] == ("low", "4.4 vs 4.2 yards a carry")
+    assert g["Unit matchup"] == ("low", "run offense B vs defense C")
+    assert g["Implied points vs his team's scoring"] == ("low", "29.5 vs 27.3 a game")
+    assert g["Game script"] == ("low", "favored by 9.5: teams ahead tend to run more")
+    assert card.grid_cell("low", "4.4 vs 4.2") == "▼ low · 4.4 vs 4.2" and card.grid_cell(None, "x") == "– x"
+    # the facts are about the line, not a side
+    assert card.holds_up(pl, c, "under", opp="TB", game_lines=GL, opp_row=OPP, grades={"off": "B", "def": "C"},
+                         qb_today="", scoring=SCORING, fixed_spread=3.0) == \
+        card.holds_up(pl, c, "over", opp="TB", game_lines=GL, opp_row=OPP, grades={"off": "B", "def": "C"},
+                      qb_today="", scoring=SCORING, fixed_spread=3.0)
+
+
+def test_part_four_says_why_a_row_has_no_direction():
+    pl, c, _ = _card()
+    g = _grid(pl, c, game_lines={**GL, "points": 2.5}, qb_today="Dak Prescott ruled Out.", opp_row=None)
+    assert g["Unit matchup"] == (None, "graded with Dak Prescott, who is Out")
+    assert g["Game script"] == (None, "favored by 2.5: a close game")
+    assert g["Opponent's rate vs his longer-run rate"] == (None, "not available")
+    dog = _grid(pl, c, game_lines={**GL, "favorite": "TB"})
+    assert dog["Game script"] == ("high", "9.5-point underdog: teams behind tend to run less")
+
+
+def test_a_passing_card_reads_the_game_script_the_other_way():
+    pl, c, _ = _card()
     c = {**c, "market": "rec_yds"}
     pl.perf = None
-    high, low = card.holds_up(pl, c, "over", opp="TB", game_lines={**GL, "favorite": "TB"}, opp_row=None,
-                              grades=None, qb_today="", scoring=None, fixed_spread=3.0)
-    assert low == ["DAL is a 9.5-point underdog: teams behind tend to throw more (a general tendency, "
-                   "not his own history)."] and high == []
+    assert _grid(pl, c, opp_row=None, grades=None)["Game script"] == \
+        ("high", "favored by 9.5: teams ahead tend to throw less")
+    assert _grid(pl, c, opp_row=None, grades=None, game_lines={**GL, "favorite": "TB"})["Game script"] == \
+        ("low", "9.5-point underdog: teams behind tend to throw more")
+
+
+def test_the_even_line_interpolates_between_half_points():
+    # 15% of games at 0 catches, 43% at 1, 42% at 2: over 0.5 is 85%, over 1.5 is 42% -> 0.5 + 0.35/0.43
+    outs = [0] * 15 + [1] * 43 + [2] * 42
+    assert card.even_line(outs) == pytest.approx(0.5 + 0.35 / 0.43)
+    assert card.even_line([1] * 49 + [2] * 51) == pytest.approx(1.5 + 0.01 / 0.51), "51% over 1.5"
+    assert card.even_line([0] * 70 + [3] * 30) == 0.5, "under a half over the first half-point"
+
+
+def test_uneven_prices_move_the_books_50_50_off_the_line():
+    """Over -172 / Under +104 (Pickens' catches tonight): the book makes the Over the likelier side, so the
+    line it splits evenly is above the posted one; turned round, below it."""
+    fixed = settings.load()["fixed"]
+    season, window = _games()
+    pl = _player(season, window)
+    m = rush_model(ypc=4.2)
+    hi = card.compute(pl, m, "rush_yds", 64.5, odds.multiplier_from_american(-172),
+                      odds.multiplier_from_american(104), fixed)
+    lo = card.compute(pl, m, "rush_yds", 64.5, odds.multiplier_from_american(104),
+                      odds.multiplier_from_american(-172), fixed)
+    assert lo["line_50"] < 64.5 < hi["line_50"]
+    # the 50/50 line is the median game at the implied workload: half the games go over it
+    out = m.outcome(m._counts_at(card.value(hi, "book_expects")))
+    assert abs((out > hi["line_50"]).mean() - 0.5) < 0.02
 
 
 def test_the_books_split_always_adds_to_100():
     pl, c, _ = _card()
     c = {**c, "no_vig_over": 0.495}            # 49.5 rounds up to 50; the Under is the rest, not 50.5 -> 51
-    assert dict(card.line_part(pl, c, "over"))["The book's 50/50, margin removed"] == \
+    assert dict(card.line_part(pl, c, "over"))["The book's split at this line, margin removed"] == \
         "Over 50% / Under 50% (the book's numbers)"
 
 
 def test_every_game_special_is_said_in_part_four():
-    pl, c, kw = _card()
+    pl, c, _ = _card()
     pl.perf["reasons"] = [["X out"]] * 4
-    high, low = card.holds_up(pl, c, "over", opp="TB", game_lines=None, opp_row=None, grades=None, qb_today="",
-                              scoring=None, fixed_spread=3.0)
-    assert "He averaged 57.8 rushing yards in his last 4 games, every game with something special, against a 64.5 line." \
-        in high
+    g = _grid(pl, c, game_lines=None, opp_row=None, grades=None, scoring=None)
+    assert g["Without the special games"] == (None, "every game was special")
+    assert g["His average vs the line"] == ("high", "57.8 vs 64.5, all special")
 
 
 def test_a_grade_earned_with_an_out_quarterback_says_so_in_the_matchup_table():
@@ -215,13 +268,43 @@ def test_a_grade_earned_with_an_out_quarterback_says_so_in_the_matchup_table():
     assert rows["TB run offense vs DAL run defense"] == "D vs B+", "only his own team's offense"
 
 
-def test_a_favored_passing_card_says_teams_ahead_throw_less():
-    pl, c, _ = _card()
-    c = {**c, "market": "rec_yds"}
-    pl.perf = None
-    high, low = card.holds_up(pl, c, "over", opp="TB", game_lines=GL, opp_row=None, grades=None, qb_today="",
-                              scoring=None, fixed_spread=3.0)
-    assert high == ["DAL is favored by 9.5: teams ahead tend to throw less (a general tendency, not his own history)."]
+def test_game_conditions_mark_a_game_only_for_what_was_different_in_it(monkeypatch):
+    """The user, 2026-10-26: special "if somebody was out", not because somebody is out today."""
+    from props.calc import player
+    ros = pd.DataFrame([{"season": 2026, "week": w, "team": "PHI", "gsis_id": g, "full_name": n, "status": "ACT"}
+                        for w in (1, 2, 3, 4) for g, n in (("wr1", "DeVonta Smith"), ("qb1", "Jalen Hurts"))])
+    share = pd.DataFrame({"game_id": ["g1", "g2", "g4", "g1", "g2", "g3"],
+                          "gsis_id": ["wr1", "wr1", "wr1", "qb1", "qb1", "qb1"]})
+    rep = pd.DataFrame([{"season": 2026, "week": 5, "team": "PHI", "gsis_id": "wr1", "report_status": "Out"},
+                        {"season": 2026, "week": 5, "team": "PHI", "gsis_id": "qb1", "report_status": "Out"}])
+    b = type("B", (), {"rosters": ros, "snap_share": share, "schedule": None, "injury_report": lambda self, s: rep})()
+    rows = pd.DataFrame({"season": [2026] * 4, "week": [1, 2, 3, 4], "game_id": ["g1", "g2", "g3", "g4"],
+                         "team": ["PHI"] * 4, "qb_id": ["qb1", "qb1", "qb1", "qb2"],
+                         "qb_name": ["J.Hurts", "J.Hurts", "J.Hurts", "T.McKee"]})
+    monkeypatch.setattr(player, "main_teammates", lambda *a: ["wr1"])
+    monkeypatch.setattr(player, "regular_qb", lambda *a: "qb1")
+    reasons, today = player.game_conditions(b, rows, "rb1", "PHI", "RB", 2026, 5, "receptions")
+    # Smith played weeks 1, 2, 4 and is Out today: only week 3 (he did not play) is special for him; Hurts
+    # started weeks 1-3 and is Out today: only week 4 (McKee started) is special for the quarterback
+    assert reasons == [[], [], ["DeVonta Smith out"], ["T.McKee started at QB"]]
+    assert today == ["DeVonta Smith is Out; he missed 1 of these 4 games (week 3).",
+                     "Jalen Hurts (QB) is Out; another quarterback started 1 of these 4 games (week 4)."]
+    # Marquise Brown's card: three games for KC last season, one for PHI -- the KC games say so, and today's
+    # lines count his PHI game only
+    kc = rows.assign(team=["KC", "KC", "KC", "PHI"], qb_id=["m", "m", "m", "qb1"], season=[2025, 2025, 2025, 2026])
+    reasons, today = player.game_conditions(b, kc, "rb1", "PHI", "WR", 2026, 5)
+    assert reasons[:3] == [["played for KC"]] * 3
+    assert today[-1] == "Jalen Hurts (QB) is Out; he started it (his 1 game for PHI)."
+
+
+def test_the_regular_qb_is_the_one_with_the_most_starts():
+    from props.calc import player
+    sch = pd.DataFrame([dict(game_id=f"g{w}", season=2026, week=w, home_team="PHI", away_team="X", home_score=20.0,
+                             home_qb_id=q, away_qb_id="x") for w, q in ((1, "hurts"), (2, "hurts"), (3, "mckee"))])
+    assert player.regular_qb(sch, "PHI", 2026, 4) == "hurts"
+    assert player.regular_qb(sch, "PHI", 2026, 1) is None
+    tie = sch.assign(home_qb_id=["hurts", "mckee", "x2"])
+    assert player.regular_qb(tie, "PHI", 2026, 3) == "mckee", "a tie goes to the most recent starter"
 
 
 def test_one_season_game_is_singular():
@@ -264,7 +347,7 @@ def test_both_cards_print_the_four_parts_and_the_same_numbers():
         assert h in L, h
     assert "| DAL pass offense vs TB pass defense | A- vs B |" in L and "| Implied points | DAL 29.5, TB 20.0 |" in L
     assert "| TB this season | 20.0 scored, 24.5 allowed a game (4 games) |" in L
-    assert "| 3 | WAS | 19 | 98 | 5.2 | 70% | SPECIAL: Lead Back out |" in L
+    assert "| 3 * | WAS | 19 | 98 | 5.2 | 70% |" in L and "- Week 3 *: Lead Back out" in L, "notes under the table"
     assert card.HOLDS_NOTE in md and "1 THE LINE" in text and "4 DOES IT HOLD UP" in text
     import re
     nums = lambda t: set(re.findall(r"-?\d+(?:\.\d+)?", t))     # noqa: E731

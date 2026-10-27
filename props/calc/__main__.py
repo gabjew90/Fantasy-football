@@ -34,7 +34,7 @@ import pandas as pd
 from core import fetch as F
 from core.manifest import Manifest
 
-from . import capture, card, data, game_lines, lines, matchup, names, odds, opponent, player, settings, summary
+from . import capture, card, data, game_lines, lines, matchup, names, odds, opponent, player, player_card, settings, summary
 from .checks import DataError, number
 from .markets import workload_col
 from .shared import journal
@@ -377,6 +377,7 @@ def build_card(b, name_in: str, market: str, side: str = "over", *, team=None, s
     md_game = card.render_md(pl, c, side, footer=md_footer, matchup=False, **shown)
     return {**out, "c": c, "ready": True, "settings": tuned, "text": warn + text, "md": md_warn + md,
             "md_game": md_warn + md_game,          # a screen or game read: the matchup is in the game header
+            "md_footer": md_footer,                  # the player card (a game read) prints it once per quote
             "pl": pl, "shown": shown,                # the screen reads both sides from these (DECISIONS #240)
             # depths whose yards came from every position's catches (the "Calculation" follow-up; journal row)
             "pooled_depths": list(pl.receiving.get("pooled_all_positions", []))}
@@ -661,6 +662,8 @@ def game_header(b, g, season: int, fixed: dict, now) -> list[str]:
             else:
                 cell = gr.get("note") or "not available"
             L.append(f"| {off} {kind} offense vs {dfn} {kind} defense | {card._cell(cell)} |")
+    sc = _display(lambda: {t: team_points(b.schedule, t, season, wk) for t in (away, home)})
+    L += [f"| {card._cell(x)} | {card._cell(v)} |" for x, v in card.matchup_extra(away, home, gl, None, sc)]
     L.append("")
     for t in (away, home):
         if qb[t]:
@@ -769,16 +772,20 @@ def game(a) -> str:
             L += ["", f"No posted line in this game for: {x}."]
     key = "md_game" if getattr(a, "format", "text") == "md" else "text"
     gap = ["", "---", ""] if key == "md_game" else [""]          # one divider between chat cards
+    # one card per player: every line of his and both sides (the user, 2026-10-26; DECISIONS #249). A player
+    # with no line ready (not enough data, no usable quote) keeps the leg card that says why.
+    groups: dict = {}
     for p, got in pick:
-        for side in sides:
-            if side == "over":
-                L += gap + [got[key]]
-                continue
-            try:
-                L += gap + [build_card(b, got["stub"]["player"], p["market"], side, team=got["stub"]["team"],
-                                       season=season, week=wk, lookup=lookup)[key]]
-            except (player.NotFound, DataError, SystemExit) as ex:
-                L += gap + [f"{got['stub']['player']} {card.SHOW[p['market']][0]} {side}: card not built: {ex}"]
+        groups.setdefault((got["stub"]["team"], got["stub"]["player"]), []).append((p, got))
+    for (_, who), legs in groups.items():
+        ready = [got for _, got in legs if got.get("ready")]
+        if not ready:
+            L += gap + [got[key] for _, got in legs[:1]] + [got[key] for _, got in legs[1:]]
+            continue
+        others = [f"{card.SHOW[p['market']][0].capitalize()} {got['line']:g}: "
+                  + ("not enough data, so no bar: " if got["not_enough"] else "") + got["reason"]
+                  for p, got in legs if not got.get("ready")]
+        L += gap + [player_card.render_md(ready, others, sides)]
     if not pick and not a.player:
         L += ["", "Cards: name players with --player, or print every line's cards with --all."]
     return (_md_lead(warn) if key == "md_game" else warn) + "\n".join(L)

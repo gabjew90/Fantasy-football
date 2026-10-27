@@ -271,8 +271,9 @@ Run it through `python nfl.py calc <command>` -- the same commands and arguments
    the four-part read, 2026-10-26, DECISIONS #249).
    Run `leg`, `game` and `entry` with `--format md`: the calculator prints each card as markdown
    for chat, in four numbered parts that answer the user's four questions in order --
-   **1 · The line** (both prices, the book's 50/50 with the margin removed -- the book's numbers,
-   never ours --, the workload that split implies, his workload and how often he went over or
+   **1 · The line** (both prices, the book's split at this line with the margin removed -- the
+   book's numbers, never ours --, where the book's 50/50 sits and the workload the prices imply
+   (both our math; uneven prices put the 50/50 off the posted line), his workload and how often he went over or
    under the line, both sides' bars), **2 · This season** (every game this season once he has 5,
    else his last 4, each with what was special about it: left early, a teammate out or back, another
    quarterback; the averages with and without those games; then the rate table), **3 · Matchup**
@@ -283,9 +284,15 @@ Run it through `python nfl.py calc <command>` -- the same commands and arguments
    prints its comparison table first, then the cards, then the fit check and the cost. Never
    recompute, round, re-sort or reword a number, a unit or the Reliability line. In a screen or a
    game read the matchup is printed ONCE per game, in the game header (the spread and total, all
-   four unit grades, each team's quarterback, the players Out, Doubtful or Questionable): keep it
-   exactly as printed and never repeat it on each card (the user, 2026-10-11). A single leg's card
-   carries its own **3 · Matchup** table; keep that too. The one thing you add to a card is a
+   four unit grades, implied points, each team's scoring, each team's quarterback, the players Out,
+   Doubtful or Questionable): keep it exactly as printed and never repeat it on each card (the user,
+   2026-10-11). A game read prints ONE card per player (the user, 2026-10-26, DECISIONS #249): his
+   lines side by side in **1 · The lines** (so catches against yards is two columns of one table),
+   this season once (a game is special only for what was different in it: he left early, a main
+   teammate missed it, a backup QB started; who is out today is its own "Out today" note), the rates,
+   and part 4 as a grid (a row per factor, a column per line, ▲ high / ▼ low / –) -- write one Risks
+   paragraph per player card, not one per line, and never add up the arrows. `leg`, `entry` and the screen's rows keep the
+   single-leg card, which carries its own **3 · Matchup** table; keep that too. The one thing you add to a card is a
    **Risks:** paragraph right after part 4's lists, before "What needs to be true" (the user,
    2026-10-26: "what are the risks that this could go against us"). It is required, and it goes
    through this checklist, saying each item that applies in one concrete sentence from the card,
@@ -298,7 +305,8 @@ Run it through `python nfl.py calc <command>` -- the same commands and arguments
      losses (part 3);
    - the sample: how many games each average rests on, and whether the season read is his last 4
      because this season is short (part 2 says so);
-   - the market's test result (the Reliability line), word for word.
+   - the market's test result (a leg card's Reliability line, word for word; a player card does not
+     print it -- the user dropped it -- so say it only when the user asks).
    Part 4 sorts facts; it never says which side is right, and neither do you -- no pick, lean, edge
    or chance (an entry assembled under rule 7 is labelled by its view, never as a pick). Your
    analysis around a card is conditional on the user's view. The text card (no `--format`) is for

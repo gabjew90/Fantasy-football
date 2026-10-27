@@ -10,9 +10,10 @@ import math
 import re
 import textwrap
 
-from . import calc, odds
+import numpy as np
 import pandas as pd
 
+from . import calc, odds
 from .markets import min_own, stat_col, workload_col
 from .names import TEAM_NAMES
 from .player import Player
@@ -39,11 +40,14 @@ def compute(pl: Player, model: calc.Model, market: str, line: float, mult_over: 
     s_o = calc.solve_workload(model, line, t_o)
     s_u = calc.solve_workload(model, line, 1 - t_u)
     s_b = calc.solve_workload(model, line, p_book)
+    # where the book's 50/50 sits (the user's question 1, DECISIONS #249): the line the model splits evenly
+    # at the workload the prices imply. Our math, like the workload itself.
+    line_50 = even_line(model.outcome(model._counts_at(s_b.value))) if s_b.status == "ok" else None
     r_o = calc.solve_rate(model, line, t_o, usual) if usual is not None else None
     r_u = calc.solve_rate(model, line, 1 - t_u, usual) if usual is not None else None
     out = {
         "market": market, "line": line, "mult_over": mult_over, "mult_under": mult_under,
-        "break_even_over": be_o, "break_even_under": be_u, "no_vig_over": p_book,
+        "break_even_over": be_o, "break_even_under": be_u, "no_vig_over": p_book, "line_50": line_50,
         "target_over": t_o, "target_under": t_u,
         "solutions": {"needed_over": s_o, "needed_under": s_u, "book_expects": s_b,
                       "rate_needed_over": r_o, "rate_needed_under": r_u},
@@ -63,6 +67,22 @@ def compute(pl: Player, model: calc.Model, market: str, line: float, mult_over: 
 
 
 
+def even_line(outcomes) -> float:
+    """The line half the games go over. Catches and most yards come in whole numbers, so a plain median
+    lands on a whole number ("about 1 catch" for a 1.5 line priced near even); instead the share over
+    each half-point line (0.5, 1.5, ...) is read and the line where it crosses one half is interpolated
+    between the two half-points around it."""
+    x = np.sort(np.asarray(outcomes, dtype=float))
+    h = np.arange(0.5, max(float(x[-1]), 0.0) + 1.5)
+    over = 1.0 - np.searchsorted(x, h, side="right") / len(x)      # share above each half-point
+    i = int(np.argmax(over < 0.5))
+    if over[i] >= 0.5:                         # never below a half (cannot happen past the maximum)
+        return float(h[-1])
+    if i == 0:
+        return float(h[0])
+    return float(h[i - 1] + (over[i - 1] - 0.5) / (over[i - 1] - over[i]))
+
+
 # per market: the bet's words, the workload unit (singular, plural), the rate's unit (one, named on
 # every rate line: the user, 2026-10-11), and the factor from the model's rate to the shown one
 SHOW = {
@@ -75,6 +95,7 @@ SHOW = {
 RATE_TITLE = {"rush_yds": "Yards per carry", "receptions": "Catches per 10 targets", "rec_yds": "Yards per target",
               "pass_yds": "Yards per completion"}
 RATE_KEY = {"rush_yds": "ypc", "receptions": "catch", "rec_yds": "ypt", "pass_yds": "ypcomp"}
+SHORT_NAME = {"rush_yds": "Rush yds", "receptions": "Catches", "rec_yds": "Rec yds", "pass_yds": "Pass yds"}
 WIDTH = 40
 # cities shared by two teams keep the full name
 SHARED_CITY = {"NYG", "NYJ", "LA", "LAC"}
@@ -493,9 +514,20 @@ def line_part(pl: Player, c: dict, side: str) -> list[tuple[str, str]]:
     p = c["no_vig_over"]
     over = half_up(p * 100, "1")                # the Under is the rest, so the two always add to 100
     rows = [("Line", f"{c['line']:g} {bet}, Over {po} / Under {pu}"),
-            ("The book's 50/50, margin removed", f"Over {over:.0f}% / Under {100 - over:.0f}% (the book's numbers)")]
+            ("The book's split at this line, margin removed",
+             f"Over {over:.0f}% / Under {100 - over:.0f}% (the book's numbers)")]
+    l50 = c.get("line_50")
+    if l50 is None:
+        fifty = "not found in the calculator's range"
+    elif abs(l50 - c["line"]) < 0.25:          # even prices: say so, so an uneven one stands out
+        fifty = f"at the line ({c['line']:g})"
+    elif m == "receptions":                    # a few catches: one decimal says which side of the half it is
+        fifty = f"about {d1(l50)} catches"
+    else:
+        fifty = f"about {half_up(l50, '0.5'):g} {bet}"
+    rows.append(("Where the book's 50/50 sits (our math)", fifty))
     b = value(c, "book_expects")
-    rows.append(("Workload at the book's split (our math)",
+    rows.append(("Workload the prices imply (our math)",
                  f"{_work(b)} {many}" if b is not None else "not found in the calculator's range"))
     S = season_read(pl, c)
     if S is not None:
@@ -555,71 +587,97 @@ def team_points_text(team: str, sc) -> str:
     return f"{d1(pf)} scored, {d1(pa)} allowed a game ({n} games)"
 
 
+FACTORS = ["Games over the line", "Without the special games", "His average vs the line",
+           "Workload the prices imply vs his average", "Opponent's rate vs his longer-run rate", "Unit matchup",
+           "Implied points vs his team's scoring", "Game script"]
+MARK = {"high": "▲ high", "low": "▼ low"}
+
+
+def _toward(x: float, line: float, more_is_low: bool = True) -> str | None:
+    """'low' when x is above the line (his history says more than the line), 'high' below, None level."""
+    if x == line:
+        return None
+    return ("low" if x > line else "high") if more_is_low else ("high" if x > line else "low")
+
+
 def holds_up(pl: Player, c: dict, side: str, *, opp: str, game_lines: dict | None, opp_row: dict | None,
-             grades: dict | None, qb_today: str, scoring: dict | None, fixed_spread: float) -> tuple[list, list]:
-    """Part 4: the facts of parts 1-3, each sorted by the direction it points -- the line set high (his
-    history or the game says less than the line) or set low. Every fact is a number printed in parts 1-3;
-    nothing is weighed or counted, and no side is named."""
+             grades: dict | None, qb_today: str, scoring: dict | None, fixed_spread: float) -> list[tuple]:
+    """Part 4 as a grid (the user, 2026-10-26: "a more visually intuitive way"): one row per FACTORS
+    entry, each (factor, direction, evidence) -- direction "high" when it points to the line being set
+    high (his history or the game says less than the line), "low" when set low, None when level or not
+    readable. Every number is one printed in parts 1-3; nothing is weighed or counted, no side named."""
     m = c["market"]
-    bet, many, unit = SHOW[m][0], SHOW[m][1][1], SHOW[m][2]
-    high, low = [], []
+    unit = SHOW[m][2]
     line = c["line"]
+    rows = {f: (None, "not available") for f in FACTORS}
     S = season_read(pl, c)
     if S is not None:
         a, cl = S["all"], S["clean"]
         n = a["n"]
-        if S["over"] * 2 != n:
-            (low if S["over"] * 2 > n else high).append(f"He went over {line:g} in {_of(S, S['over'], n)}.")
-        use, tag = (cl, f" {_without_special(S)}") if S["special_weeks"] and cl else (a, "")
-        if S["special_weeks"] and not cl:
-            tag = ", every game with something special"
-        if S["special_weeks"] and cl and S["over_clean"] * 2 != cl["n"]:
-            (low if S["over_clean"] * 2 > cl["n"] else high).append(
-                f"{_without_special(S)[0].upper() + _without_special(S)[1:]}, over {line:g} in {S['over_clean']} of {cl['n']}.")
-        st = half_up(use["stat"], "0.1")
-        if st != line:
-            (low if st > line else high).append(f"He averaged {d1(use['stat'])} {bet} {_scope(S)}{tag}, against a {line:g} line.")
-        b = value(c, "book_expects")
-        if b is not None:
-            bs, ws = shown_work(b), half_up(use["work"], "0.1")
-            if bs != ws:
-                (high if bs > ws else low).append(
-                    f"The book's 50/50 needs about {_work(b)[1:]} {many} (our math); he averaged {d1(use['work'])}{tag}.")
+        rows["Games over the line"] = (None if S["over"] * 2 == n else ("low" if S["over"] * 2 > n else "high"),
+                                       f"{S['over']} of {n}")
+        if not S["special_weeks"]:
+            rows["Without the special games"] = (None, "no special games")
+        elif not cl:
+            rows["Without the special games"] = (None, "every game was special")
+        else:
+            k = cl["n"]
+            rows["Without the special games"] = (None if S["over_clean"] * 2 == k else
+                                                 ("low" if S["over_clean"] * 2 > k else "high"),
+                                                 f"{S['over_clean']} of {k}")
+        use = cl if S["special_weeks"] and cl else a
+        tag = " without them" if use is cl and S["special_weeks"] else (", all special" if S["special_weeks"] else "")
+        rows["His average vs the line"] = (_toward(half_up(use["stat"], "0.1"), line),
+                                           f"{d1(use['stat'])} vs {line:g}{tag}")
+        bw = value(c, "book_expects")
+        if bw is not None:
+            rows["Workload the prices imply vs his average"] = (
+                _toward(shown_work(bw), half_up(use["work"], "0.1"), more_is_low=False),
+                f"{_work(bw)} vs {d1(use['work'])}{tag}")
     if opp_row and opp_row.get("value") is not None and not opp_row.get("error"):
         ov, mine = half_up(opp_row["value"], "0.1"), half_up(c["rate"] * SHOW[m][3], "0.1")
-        if ov != mine:
-            (low if ov > mine else high).append(
-                f"{city(opp)} has allowed {d1(opp_row['value'])} {unit}{opp_row.get('who', '')}; "
-                f"his longer-run rate is {mine:.1f}.")
+        rows["Opponent's rate vs his longer-run rate"] = (_toward(ov, mine), f"{ov:.1f} vs {mine:.1f} {unit}")
     kind = "run" if m == "rush_yds" else "pass"
     gr = grades or {}
-    if gr.get("off") and gr.get("def") and not str(qb_today).endswith(" ruled Out."):
-        from .screen import grade_rank
-        o, d = grade_rank(gr["off"]), grade_rank(gr["def"])
-        if o is not None and d is not None and o != d:
-            (low if o < d else high).append(f"{pl.team} {kind} offense {gr['off']} vs {opp} {kind} defense {gr['def']}.")
+    if gr.get("off") and gr.get("def"):
+        if str(qb_today).endswith(" ruled Out."):
+            rows["Unit matchup"] = (None, f"graded with {qb_today.removesuffix(' ruled Out.')}, who is Out")
+        else:
+            from .screen import grade_rank
+            o, d = grade_rank(gr["off"]), grade_rank(gr["def"])
+            rows["Unit matchup"] = (None if o is None or d is None or o == d else ("low" if o < d else "high"),
+                                    f"{kind} offense {gr['off']} vs defense {gr['def']}")
+    elif gr.get("note"):
+        rows["Unit matchup"] = (None, gr["note"].rstrip("."))
     imp = implied_totals(game_lines, pl.team, opp)
     sc = (scoring or {}).get(pl.team)
     if imp is not None and sc is not None and sc[2]:
         it, pf = half_up(imp[pl.team], "0.1"), half_up(sc[0], "0.1")
-        if it != pf:
-            (low if it > pf else high).append(f"{pl.team} is implied {it:.1f} points; it has scored {pf:.1f} a game.")
+        rows["Implied points vs his team's scoring"] = (_toward(it, pf), f"{it:.1f} vs {pf:.1f} a game")
     if game_lines and game_lines.get("favorite") in (pl.team, opp) and not game_lines.get("spread_unread"):
         pts = float(game_lines.get("points") or 0)
-        if pts >= fixed_spread:
-            fav = game_lines["favorite"] == pl.team
-            who = f"{pl.team} is favored by {pts:g}" if fav else f"{pl.team} is a {pts:g}-point underdog"
-            general = "a general tendency, not his own history"
-            if m == "rush_yds":
-                why = "teams ahead tend to run more" if fav else "teams behind tend to run less"
-                (low if fav else high).append(f"{who}: {why} ({general}).")
-            else:
-                why = "teams ahead tend to throw less" if fav else "teams behind tend to throw more"
-                (high if fav else low).append(f"{who}: {why} ({general}).")
-    return high, low
+        fav = game_lines["favorite"] == pl.team
+        who = f"favored by {pts:g}" if fav else f"{pts:g}-point underdog"
+        if pts < fixed_spread:
+            rows["Game script"] = (None, f"{who}: a close game")
+        elif m == "rush_yds":
+            rows["Game script"] = ("low" if fav else "high", who + (": teams ahead tend to run more" if fav else
+                                                                    ": teams behind tend to run less"))
+        else:
+            rows["Game script"] = ("high" if fav else "low", who + (": teams ahead tend to throw less" if fav else
+                                                                    ": teams behind tend to throw more"))
+    elif game_lines and game_lines.get("spread_text") and not game_lines.get("favorite"):
+        rows["Game script"] = (None, "even spread: a close game")
+    return [(f, *rows[f]) for f in FACTORS]
 
 
-HOLDS_NOTE = "Sorted from parts 1-3, not weighed: none of this is tested, and it is not a chance."
+def grid_cell(direction: str | None, evidence: str) -> str:
+    return f"{MARK[direction]} · {evidence}" if direction else f"– {evidence}"
+
+
+HOLDS_NOTE = ("▲ points to the line being set high, ▼ set low, – neither or no data. Not weighed, not tested, "
+              "not a chance; game script is a general tendency.")
+
 
 
 def matchup_md(pl: Player, market: str, opp: str, lines_: dict | None, why_none: str = "",
@@ -833,13 +891,11 @@ def render(pl: Player, c: dict, side: str, *, opp: str, game_lines: dict | None 
     else:
         out += ["", f"Only {c['usual_games']} games: no recent average yet."]
     out += [""] + matchup_lines(pl, m, opp, game_lines, why_no_lines, grades, qb_today, grades_all, scoring)
-    high, low = holds_up(pl, c, side, opp=opp, game_lines=game_lines, opp_row=opp_row, grades=grades,
-                         qb_today=qb_today, scoring=scoring, fixed_spread=c["script_spread"])
+    grid = holds_up(pl, c, side, opp=opp, game_lines=game_lines, opp_row=opp_row, grades=grades,
+                    qb_today=qb_today, scoring=scoring, fixed_spread=c["script_spread"])
     out += ["", "4 DOES IT HOLD UP"]
-    for head_, facts in (("Points to the line set high:", high), ("Points to it set low:", low)):
-        out.append(head_)
-        for x in facts or ["nothing on this card"]:
-            out += _wrap(f"- {x}")
+    for f, d, ev in grid:
+        out += _wrap(f"{f}: {grid_cell(d, ev)}")
     out += _wrap(HOLDS_NOTE)
     q = question(m, side, P["work_ask"], P["rate_ask"], P["reached"], len(rows), P["split"])
     if q:
@@ -907,8 +963,15 @@ def render_md(pl: Player, c: dict, side: str, *, opp: str, game_lines: dict | No
         out += [f"No games before week {pl.week}.", ""]
     else:
         head, body = season_table(pl, c, S)
-        out += ["| " + " | ".join(head) + " |", "|" + "---|" * len(head)]
-        out += ["| " + " | ".join(_cell(x) for x in cells) + " |" for cells in body] + [""]
+        # the notes go under the table, not in a wide column (the user, 2026-10-26: readability first)
+        out += ["| " + " | ".join(head[:-1]) + " |", "|" + "---|" * (len(head) - 1)]
+        out += ["| " + " | ".join(_cell(x) for x in [cells[0] + (" *" if cells[6].startswith("SPECIAL") else "")]
+                                  + cells[1:6]) + " |" for cells in body] + [""]
+        notes = [(f"Week {cells[0]}" if cells[0].isdigit() else cells[0])
+                 + (" *" if cells[6].startswith("SPECIAL") else "") + ": " + cells[6].removeprefix("SPECIAL: ")
+                 for cells in body if cells[6] != "-"]
+        if notes:
+            out += ["What was different (* = left out of the second average):", ""] + [f"- {n}" for n in notes] + [""]
         for x in season_lines(c, S):
             out += [x, ""]
     hist = []
@@ -956,12 +1019,10 @@ def render_md(pl: Player, c: dict, side: str, *, opp: str, game_lines: dict | No
         out += matchup_md(pl, m, opp, game_lines, why_no_lines, grades, qb_today, grades_all, scoring) + [""]
     else:
         out += ["Part 3, the matchup, is in the game header above.", ""]
-    high, low = holds_up(pl, c, side, opp=opp, game_lines=game_lines, opp_row=opp_row, grades=grades,
-                         qb_today=qb_today, scoring=scoring, fixed_spread=c["script_spread"])
-    out += ["**4 · Does it hold up**", ""]
-    for head_, facts in (("Points to the line being set high:", high), ("Points to it being set low:", low)):
-        out += [head_, ""] + [f"- {x}" for x in (facts or ["nothing on this card"])] + [""]
-    out += [HOLDS_NOTE, ""]
+    grid = holds_up(pl, c, side, opp=opp, game_lines=game_lines, opp_row=opp_row, grades=grades,
+                    qb_today=qb_today, scoring=scoring, fixed_spread=c["script_spread"])
+    out += ["**4 · Does it hold up**", "", f"| What the card shows | {SHORT_NAME[m]} {c['line']:g} |", "|---|---|"]
+    out += [f"| {f} | {_cell(grid_cell(d, ev))} |" for f, d, ev in grid] + ["", HOLDS_NOTE, ""]
     cond = condition(m, side, P["work_ask"], P["rate_ask"], P["reached"], len(rows), P["split"])
     if cond:
         out += [f"What needs to be true: {cond}", ""]
