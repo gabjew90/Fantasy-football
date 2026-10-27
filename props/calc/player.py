@@ -223,6 +223,7 @@ class Player:
     perf: pd.DataFrame | None = None
     perf_scope: str = ""                              # "season" or "recent"
     today: list = field(default_factory=list)         # who is out today against those games (game_conditions)
+    tonight: bool = False                             # some of those games share an absence with tonight's
 
     def usual(self, market: str, games: int) -> float | None:
         """His average workload over his last `games` games played; None with
@@ -473,17 +474,21 @@ def regular_qb(schedule: pd.DataFrame, team: str, season: int, week: int):
 
 
 def game_conditions(b: Bundle, rows: pd.DataFrame, gsis: str, team: str, pos: str, season: int, week: int,
-                    market: str | None = None) -> tuple[list[list[str]], list[str]]:
+                    market: str | None = None) -> tuple[list[list[str]], list[str], list[bool] | None]:
     """What was different IN each game (the user, 2026-10-26: special only "if somebody was out", not
     because somebody is out today): a main teammate (main_teammates, with the market) took no offensive
     snap while on the team's roster that week, in a game the player played for this team; or someone
     other than the team's regular starting QB (regular_qb) started it. Today's lineup is reported apart:
     for each main teammate or the regular QB who is Out or on IR today, how many of these games were
-    without him. Returns (reasons per row, today's lines). Display only: the season read's second
-    average leaves out a game with a reason; no bar, rate or screen check reads it."""
+    without him. Games like tonight (the user, 2026-10-27, after Lemon's 7 catches with Smith out): when
+    an absence of tonight's also happened in some of these games, a game is like tonight if each absence
+    in it is also one tonight's (Smith out in both; Goedert out then but playing tonight is not). Returns
+    (reasons per row, today's lines, like-tonight per row -- None when no game shares an absence with
+    tonight, and the season read's second average then leaves out every game with a reason). Display
+    only: no bar, rate or screen check reads it."""
     n = len(rows)
     if not n:
-        return [], []
+        return [], [], None
     rep = b.injury_report(season)
     wk_rep = rep[(rep["season"] == season) & (rep["week"] == week)] if rep is not None else None
     status = {} if wk_rep is None else dict(zip(wk_rep["gsis_id"], wk_rep["report_status"]))
@@ -499,6 +504,8 @@ def game_conditions(b: Bundle, rows: pd.DataFrame, gsis: str, team: str, pos: st
     reasons: list[list[str]] = [[f"played for {t}"] if not ours[i] else [] for i, t in
                                 enumerate(rows["team"] if "team" in rows else [team] * n)]
     lines = []
+    conds: list[set] = [set() for _ in range(n)]      # each game's absences, as keys tonight's can match
+    now: set = set()
     k = sum(ours)
     these = (f"these {k} games" if k == n else f"his {k} game{'' if k == 1 else 's'} for {team}")
     for m in main_teammates(b, gsis, team, pos, season, week, market):
@@ -509,8 +516,10 @@ def game_conditions(b: Bundle, rows: pd.DataFrame, gsis: str, team: str, pos: st
         name = names_.get(m, m)
         for i in out_idx:
             reasons[i].append(f"{name} out")
+            conds[i].add(("out", m))
         gone = today(m)
         if gone:
+            now.add(("out", m))
             lines.append(f"{name} is {gone}; he missed {len(out_idx)} of {these} "
                          f"({_weeks_text(rows, out_idx, season)})." if out_idx
                          else f"{name} is {gone}; he played in {'it' if k == 1 else 'all of them'} "
@@ -523,13 +532,17 @@ def game_conditions(b: Bundle, rows: pd.DataFrame, gsis: str, team: str, pos: st
             other = [i for i in range(n) if ours[i] and isinstance(qb_ids[i], str) and qb_ids[i] and qb_ids[i] != reg]
             for i in other:
                 reasons[i].append(f"{qb_nm[i] if isinstance(qb_nm[i], str) and qb_nm[i] else 'another QB'} started at QB")
+                conds[i].add(("qb",))
             gone = today(reg)
             if gone:
+                now.add(("qb",))
                 qb = names_.get(reg, reg)
                 lines.append(f"{qb} (QB) is {gone}; another quarterback started {len(other)} of {these} "
                              f"({_weeks_text(rows, other, season)})." if other
                              else f"{qb} (QB) is {gone}; he started {'it' if k == 1 else 'all of them'} ({these}).")
-    return reasons, lines
+    if not now & set().union(*conds):
+        return reasons, lines, None
+    return reasons, lines, [bool(ours[i] and conds[i] and conds[i] <= now) for i in range(n)]
 
 
 HURT = ("Out", "Doubtful", "Questionable")
@@ -626,12 +639,12 @@ def build(b: Bundle, gsis: str, name: str, team: str, season: int, week: int,
     # the performance read (DECISIONS #249): every game this season once there are enough, else his last games
     scope = "season" if len(this) >= int(fixed["season_read_min_games"]) else "recent"
     perf = this if scope == "season" else _results(b, mine.tail(last_n), margin)
-    why_games, today = game_conditions(b, perf, gsis, team, pos, season, week, market)
-    perf = left_early(perf.assign(reasons=why_games), b, mine,     # injury reports only for the games shown
-                      float(fixed["fewer_snaps_share"]))
+    why_games, today, like = game_conditions(b, perf, gsis, team, pos, season, week, market)
+    perf = left_early(perf.assign(reasons=why_games, like_tonight=like or [False] * len(perf)), b, mine,
+                      float(fixed["fewer_snaps_share"]))     # injury reports only for the games shown
     pools = b.pools(season, int(fixed["pool_seasons"]))
     pl = Player(gsis, name, team, pos, season, week, window, this, pools=pools, lineup=causes, lineup_flags=qflags,
-                perf=perf, perf_scope=scope, today=today)
+                perf=perf, perf_scope=scope, today=today, tonight=like is not None)
     keys = pd.MultiIndex.from_frame(window[["season", "week"]]) if len(window) else None
 
     def own(df):

@@ -123,3 +123,18 @@ def test_every_number_on_the_player_card_is_on_his_leg_cards():
     assert not extra, extra
     for banned in ("better", "pick", "lean", "recommend", "likely"):
         assert not re.search(rf"\b{banned}\b", md.lower()), banned
+
+
+def test_the_second_average_is_the_games_like_tonight_when_tonights_absence_happened_before():
+    """DECISIONS #251: weeks 3 and 4 had tonight's absence, so they are the second average (starred games
+    kept), and the heading under the tables no longer says the starred games are left out."""
+    items = _items()
+    pl = items[0]["pl"]
+    pl.perf = pl.perf.assign(reasons=[[], [], ["Lead Back out"], ["Lead Back out"]],
+                             like_tonight=[False, True, True, True])
+    pl.tonight = True
+    L = player_card.render_md(items, [], ["over"]).splitlines()
+    assert "| Like tonight, wk 3, 4 (2) |  | 19.0 | 80.0 | 4.2 |  |" in L, "week 2 left early: never like tonight"
+    assert not any(x.startswith("| Without * ") for x in L)
+    assert "What was different (*; the second average is the games like tonight):" in L
+    assert any(x.startswith("| Games like tonight | – 1 of 2 (weeks 3 and 4) |") for x in L)

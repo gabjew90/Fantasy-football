@@ -9314,3 +9314,25 @@ exactly the old 0.1 per 10, so every rounding, comparison and screen mark is as 
 point: one-decimal percent would have changed the screen's marks the week-8 rerun is pre-registered on);
 the model, the bars and every test result are unchanged (card.SHOW's factor 100, opponent.allows' value in percent, card.rate_str joins a rate to
 its unit in one place).
+
+## 2026-10-27 (251) -- the second average is the games like tonight
+
+DAL at PHI, week 7: Makai Lemon went 7 for 67 with DeVonta Smith and Dontayvion Wicks out and Tanner
+McKee starting. His card's second average left out exactly the games that looked like that night (Smith
+out, McKee starting) and compared the line with the other two: 2.5 targets, 2.0 catches, 4.5 yards. The
+user asked for the comparison with games like tonight instead. Replace, not add: the second average,
+part 1's second count and part 4's row (renamed "Games like tonight", still the second row) now read
+one set of games.
+- **Games like tonight** (player.game_conditions): when an absence of tonight's -- a main teammate Out
+  or on IR, or the regular QB, so a backup starts -- also happened in some of the games shown, a game is
+  like tonight if each absence in it is one of tonight's. Smith out then and tonight counts; Goedert out
+  then but playing tonight does not. A game he left early, played for another team or (a QB) did not
+  start is never one. Lemon: weeks 5 and 6, 6.5 targets, 4.0 catches, 31 yards.
+- When no game shares an absence with tonight (nobody out, or out tonight for the first time like
+  Wicks), the second set is the games with nothing special, exactly as before.
+- Part 2's second row reads "Like tonight, wk 5, 6 (2)"; the list under the tables is headed "What was
+  different (*; the second average is the games like tonight)", since starred games are then kept.
+- Display only: no bar, rate, model input or screen check reads it; the last-4 lineup check (#247) and
+  the week-8 screen rerun are untouched. One game prompted it; it is a read of the relevant games, not
+  a measured improvement.
+
