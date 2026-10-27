@@ -407,3 +407,18 @@ def test_the_season_read_and_part_four_compare_with_the_games_like_tonight():
     assert card.season_lines(c, S)[1] == ("Average in games like tonight (weeks 3 and 4): 19.0 carries, "
                                           "80.0 rushing yards, 4.2 yards a carry (2 games).")
     assert card.notes_head(True).startswith("What was different (*; the second average is the games like tonight")
+
+
+def test_with_no_game_like_tonight_the_card_does_not_say_every_game_was_special():
+    """Review of #251: tonight's absence happened before, but each such game had another change too,
+    and other games had nothing special -- the card must not claim every game was special."""
+    pl, c, _ = _card()
+    pl.perf["reasons"] = [[], [], ["X out", "Y out"], []]
+    pl.perf["like_tonight"] = [False] * 4
+    pl.tonight = True
+    rows = dict(card.line_part(pl, c, "over"))
+    assert rows["His carries in his last 4 games"] == "15.5 a game; no game like tonight without another change"
+    g = _grid(pl, c)
+    assert g["Games like tonight"] == (None, "none: each also had another change")
+    assert g["His average vs the line"][1] == "57.8 vs 64.5, none like tonight"
+    assert card.notes_head(None) == "What was different (*):"

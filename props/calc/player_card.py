@@ -133,7 +133,8 @@ def season_part(items: list[dict]) -> tuple[str, list[str]]:
                                f"{C.half_up(float(snap) * 100, '1'):.0f}%" if snap is not None and snap == snap else "-"]))
         out += _average_rows(x, perf, special[x], like[x], weeks) + [""]
     if notes:
-        out += [C.notes_head(any(like[x] is not None for x in groups)), ""] + [f"- {n}" for n in notes] + [""]
+        modes = {like[x] is not None for x in groups}
+        out += [C.notes_head(modes.pop() if len(modes) == 1 else None), ""] + [f"- {n}" for n in notes] + [""]
     today = []
     for g, _ in reads:
         today += [x for x in g["pl"].today if x not in today]
