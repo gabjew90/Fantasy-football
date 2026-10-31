@@ -9336,3 +9336,24 @@ one set of games.
   the week-8 screen rerun are untouched. One game prompted it; it is a read of the relevant games, not
   a measured improvement.
 
+
+## 2026-10-30 (252) -- Sleeper against the books compares the Sleeper line at the time of the snapshot
+
+- **The defect (found grading the week-7 and week-8 cards, verified against the archive):** the
+  scorecard's Sleeper-vs-DraftKings/FanDuel rule (#147, reports/sleeper_vs_books.md) joined each
+  settled engine CALL to the one book snapshot per game. A call is the last decision per pricing
+  model, so a model replaced mid-week left its Thursday line in play: Swift's week-5 rushing call
+  was 61.5 (Thursday) against the books' 83.5 (Sunday), when Sleeper's own line was already 83.5.
+  56 of the 111 graded bets compared lines 24+ hours apart, 38 of the 41 yardage bets among them.
+  Root cause: code -- the rule is model-free, but it read the engine's calls for Sleeper's line.
+- **The fix (the user's go, 2026-10-30):** Sleeper's line and prices come from the line archive,
+  the quote nearest the book snapshot with both sides from one retrieval, within 15 minutes
+  (scorecard.BOOKS_SAME_TIME_MIN; in weeks 4-8, 1,574 of 1,903 consensus keys had one within 15
+  minutes and none between 15 and 60). One bet per player and market. The result is the player's
+  settled stat; no settled stat, no bet (a missing stat used to grade as a loss). Thresholds, sides,
+  grading and the reading rule are unchanged; the pre-registration carries a dated amendment.
+- **Re-read through week 7:** 60 bets, 44 won (73.3%) against 65.2% needed, +12.1 per $100
+  (95% range -1.3 to +27.2), no verdict (the rule needs 200+). 58 of the 60 are receptions lines,
+  mostly where DraftKings and FanDuel disagree with each other by a catch and Sleeper prices the
+  favoured side at -150 or worse; the 2 same-time yardage bets lost. The old figure (111, +5.2)
+  is superseded.
