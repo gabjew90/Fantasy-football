@@ -22,6 +22,7 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import datetime as dt
 import json
 import sys
 from pathlib import Path
@@ -180,6 +181,15 @@ BOOKS_MIN = 200                     # reports/sleeper_vs_books.md: the reading r
 LINE_OFF = {"player_receptions": 0.5, "player_reception_yds": 2.5, "player_rush_yds": 2.5,
             "player_pass_yds": 5.0, "player_rush_reception_yds": 3.0}
 PRICE_OFF = 0.03
+# The Sleeper quote a book snapshot is compared with must be taken within this many minutes of
+# it -- in practice the same capture run (DECISIONS #252; 1,574 of 1,903 consensus keys in weeks
+# 4-8 had one within 15 minutes, the next nearest was over an hour away)
+BOOKS_SAME_TIME_MIN = 15
+
+
+def _utc(text: str) -> dt.datetime:
+    t = dt.datetime.fromisoformat(str(text).strip().replace("Z", "+00:00"))
+    return t if t.tzinfo else t.replace(tzinfo=dt.timezone.utc)
 
 
 def _novig_over(po, pu):
@@ -189,18 +199,34 @@ def _novig_over(po, pu):
     return io / (io + iu)
 
 
-def books_consensus(rows: list[dict]) -> dict:
-    """(week, player key, market) -> (consensus line, consensus no-vig Over
-    chance at that line) from DraftKings/FanDuel comparison rows."""
+def _books_key(r: dict) -> tuple:
+    """One player-market in one game: (week, home team, away team, player key, market).
+    The teams keep two players with one normalised name in different games apart
+    (neither the Odds API rows nor the line archive carry a player ID to join on)."""
     import settle as _s
+    return (int(r["week"]), str(r["home_team"]), str(r["away_team"]), _s.norm_name(str(r["player"])), r["market"])
+
+
+def books_consensus(rows: list[dict], skipped: dict | None = None) -> dict:
+    """_books_key -> (consensus line, consensus no-vig Over chance at that line,
+    snapshot time) from DraftKings/FanDuel comparison rows. The snapshot time is
+    the later of the books' retrievals (one per game). An unreadable row is skipped
+    and counted in `skipped`."""
+    skipped = {} if skipped is None else skipped
     by: dict = {}
+    when: dict = {}
     for r in rows:
-        k = (int(r["week"]), _s.norm_name(str(r["player"])), r["market"], r["book"], float(r["line"]))
-        by.setdefault(k, {})[r["side"]] = int(r["price"])
+        try:
+            k, t = _books_key(r), _utc(r["retrieved_at_utc"])
+            by.setdefault(k + (r["book"], float(r["line"])), {})[r["side"]] = int(r["price"])
+        except (KeyError, TypeError, ValueError):
+            skipped["comparison rows"] = skipped.get("comparison rows", 0) + 1
+            continue
+        when[k] = max(when.get(k, t), t)
     per: dict = {}
-    for (wk, nm, mk, bk, ln), sides in by.items():
+    for key, sides in by.items():
         if "Over" in sides and "Under" in sides:
-            per.setdefault((wk, nm, mk), []).append((ln, _novig_over(sides["Over"], sides["Under"])))
+            per.setdefault(key[:5], []).append((key[6], _novig_over(sides["Over"], sides["Under"])))
     out = {}
     for k, v in per.items():
         lines = sorted(x[0] for x in v)
@@ -208,62 +234,122 @@ def books_consensus(rows: list[dict]) -> dict:
         at = [p for ln, p in v if ln == med]
         # no book at the median line (DK 3.5, FD 4.5): no consensus PRICE there,
         # only a consensus line -- prices quoted at different lines never average
-        out[k] = (med, sum(at) / len(at) if at else None)
+        out[k] = (med, sum(at) / len(at) if at else None, when[k])
     return out
 
 
-def books_rows(df: pd.DataFrame, rows: list[dict]) -> pd.DataFrame:
-    """Each settled Sleeper call joined to the consensus, with the favoured side
-    graded at Sleeper's own price (reports/sleeper_vs_books.md)."""
-    import settle as _s
-    if not rows or df.empty or "price_over" not in df.columns:
-        return pd.DataFrame()
-    cons = books_consensus(rows)
-    out = []
-    # one bet per Sleeper line: the same line can be a call under two pricing
-    # models in one week (an engine release mid-week)
-    d0 = df[df["market"].isin(list(LINE_OFF))].drop_duplicates(["week", "player", "market", "line"], keep="last")
-    for _, r in d0.iterrows():
+def sleeper_at(quotes: list[dict], cons: dict, skipped: dict | None = None) -> dict:
+    """_books_key -> Sleeper's quote nearest the book snapshot: (line, Over price,
+    Under price, event id), from the line archive. Only a quote with both sides from
+    one retrieval within BOOKS_SAME_TIME_MIN of the snapshot counts -- a line Sleeper
+    had already moved off is not a bet anyone could place. The archive keeps only the
+    latest retrieval of a line (persist.LINE_KEY has no time), so a line re-quoted
+    unchanged well after the snapshot has no row near it and is not graded."""
+    skipped = {} if skipped is None else skipped
+    pairs: dict = {}
+    for q in quotes:
         try:
-            line, actual = float(r["line"]), float(r["actual"])
-            po, pu = int(float(r["price_over"])), int(float(r["price_under"]))
-        except (TypeError, ValueError):
+            k = _books_key(q)
+            if k not in cons or q.get("price_american") is None:
+                continue
+            pk = (k, float(q["point"]), _utc(q["retrieved_at_utc"]), q.get("event_id"))
+            pairs.setdefault(pk, {})[q["outcome"]] = int(q["price_american"])
+        except (KeyError, TypeError, ValueError):
+            skipped["Sleeper quotes"] = skipped.get("Sleeper quotes", 0) + 1
+    best: dict = {}
+    for (k, line, at, ev), sides in pairs.items():
+        if "Over" not in sides or "Under" not in sides:
             continue
-        c = cons.get((int(r["week"]), _s.norm_name(str(r["player"])), r["market"]))
-        if c is None:
+        gap = abs((at - cons[k][2]).total_seconds()) / 60
+        if gap <= BOOKS_SAME_TIME_MIN and (k not in best or gap < best[k][0]):
+            best[k] = (gap, (line, sides["Over"], sides["Under"], ev))
+    return {k: v[1] for k, v in best.items()}
+
+
+def books_rows(df: pd.DataFrame, rows: list[dict], quotes: list[dict]) -> pd.DataFrame:
+    """One bet per player-market and game where Sleeper's line or price, quoted at
+    the time of the DraftKings/FanDuel snapshot, sits off their consensus: the
+    favoured side graded at Sleeper's own price (reports/sleeper_vs_books.md). The
+    result is the player's settled stat in that game (joined on Sleeper's event id);
+    a player with no settled row is not graded. `attrs["coverage"]` counts each step."""
+    import settle as _s
+    skipped: dict = {}
+    cons = {k: v for k, v in books_consensus(rows, skipped).items() if k[-1] in LINE_OFF}
+    same = sleeper_at(quotes, cons, skipped)
+    actual_of = {}
+    if not df.empty and "actual" in df.columns:
+        for _, r in df.iterrows():
+            a = pd.to_numeric(r.get("actual"), errors="coerce")
+            if pd.notna(a):
+                actual_of[(str(r.get("event_id")), _s.norm_name(str(r["player"])), r["market"])] = float(a)
+    out = []
+    graded = 0
+    for k, (line, po, pu, ev) in same.items():
+        c, actual = cons[k], actual_of.get((str(ev), k[3], k[4]))
+        if actual is None:
             continue
+        graded += 1
         d = line - c[0]
-        if abs(d) >= LINE_OFF[r["market"]]:
+        if abs(d) >= LINE_OFF[k[-1]]:
             kind, fav = "line off", ("Under" if d > 0 else "Over")
         elif d == 0 and c[1] is not None and abs(c[1] - _novig_over(po, pu)) >= PRICE_OFF:
             kind, fav = "price off", ("Over" if c[1] > _novig_over(po, pu) else "Under")
         else:
             continue
+        price = po if fav == "Over" else pu
         if actual == line:
             won, pnl = None, 0.0
         else:
             won = (actual > line) if fav == "Over" else (actual < line)
-            pnl = _s.american_pnl(po if fav == "Over" else pu, won)
-        price = po if fav == "Over" else pu
-        out.append({"kind": kind, "event_id": r.get("event_id"), "won": won, "pnl": pnl,
+            pnl = _s.american_pnl(price, won)
+        out.append({"kind": kind, "event_id": ev, "week": k[0], "player": k[3], "market": k[-1],
+                    "line": line, "consensus": c[0], "side": fav, "price": price, "actual": actual,
+                    "won": won, "pnl": pnl,
                     "breakeven": (abs(price) / (abs(price) + 100) if price < 0 else 100 / (price + 100))})
-    return pd.DataFrame(out)
+    b = pd.DataFrame(out)
+    b.attrs["coverage"] = {"consensus": len(cons), "same_time": len(same), "settled": graded, "skipped": skipped}
+    return b
+
+
+def _jsonl(path: Path) -> tuple[list[dict], int]:
+    """A JSONL file's rows, and how many lines could not be read (skipped, as persist.append_jsonl does)."""
+    rows, bad = [], 0
+    if path.exists():
+        with path.open(encoding="utf-8") as fh:
+            for ln in fh:
+                if ln.strip():
+                    try:
+                        rows.append(json.loads(ln))
+                    except json.JSONDecodeError:
+                        bad += 1
+    return rows, bad
 
 
 def books_section(df: pd.DataFrame, season: int) -> list[str]:
     """Sleeper against DraftKings/FanDuel: the consensus-favoured side at
     Sleeper's price, by discrepancy type, with the pre-registered reading rule."""
     root = persist.RECORD_ROOT / "compare" / str(season)
-    rows = []
+    rows, bad = [], 0
     for f in sorted(root.glob("wk*.jsonl")) if root.exists() else []:
-        with f.open(encoding="utf-8") as fh:
-            rows += [json.loads(ln) for ln in fh if ln.strip()]
+        r, n = _jsonl(f)
+        rows, bad = rows + r, bad + n
+    quotes, n = _jsonl(persist.lines_path(season))
+    bad += n
     out = ["## Sleeper against DraftKings/FanDuel", "",
-           "Not the model: when Sleeper's line or price sits off the DraftKings/FanDuel consensus, the side the "
-           "consensus favours, bet at Sleeper's price (reports/sleeper_vs_books.md).", ""]
-    b = books_rows(df, rows)
+           "Not the model: when Sleeper's line or price, quoted at the time of the DraftKings/FanDuel snapshot "
+           f"(within {BOOKS_SAME_TIME_MIN} minutes), sits off their consensus, the side the consensus favours, "
+           "bet at Sleeper's price (reports/sleeper_vs_books.md; same-time since DECISIONS #252).", ""]
+    b = books_rows(df, rows, quotes)
+    cov = b.attrs.get("coverage", {})
+    skipped = dict(cov.get("skipped", {}), **({"unreadable lines": bad} if bad else {}))
+    out += [f"Coverage: {cov.get('consensus', 0)} player-markets with a DraftKings/FanDuel consensus; "
+            f"{cov.get('same_time', 0)} with a Sleeper quote within {BOOKS_SAME_TIME_MIN} minutes of it; "
+            f"{cov.get('settled', 0)} of those with a settled result (the engine priced the player)."
+            + (" Skipped as unreadable: " + ", ".join(f"{v} {k}" for k, v in skipped.items()) + "." if skipped else ""),
+            ""]
     if b.empty:
-        return out + [f"{len(rows)} comparison rows logged; no settled Sleeper call has a matching discrepancy yet.", ""]
+        return out + [f"{len(rows)} comparison rows logged; no same-time Sleeper quote with a settled result "
+                      "has a matching discrepancy yet.", ""]
     out += ["| Discrepancy | Bets | Won | Win rate | Break-even | Net per $100 (95% CI) |", "|---|---|---|---|---|---|"]
     rng = np.random.default_rng(7)
     for kind, g in list(b.groupby("kind")) + [("both, pooled", b)]:

@@ -81,34 +81,99 @@ def test_no_key_is_a_reason_not_a_failure(tmp_path, monkeypatch, capsys):
     assert "compare: skipped (RuntimeError: no key)" in capsys.readouterr().out
 
 
+SNAP = "2026-10-04T15:00:00Z"
+
+
+def _quote(line, po, pu, at, player="Dalton Schultz", week=4, ev="s1"):
+    """Sleeper's two sides of one line from one retrieval, as the line archive holds them."""
+    base = {"week": week, "player": player, "market": "player_receptions", "point": line,
+            "retrieved_at_utc": at, "event_id": ev, "bookmaker": "sleeper",
+            "home_team": EVENT["home_team"], "away_team": EVENT["away_team"]}
+    return [dict(base, outcome="Over", price_american=po), dict(base, outcome="Under", price_american=pu)]
+
+
+def _settled(actual, player="Dalton Schultz", week=4, ev="s1"):
+    # the scorecard's calls: only the player's result in that game is read from them now
+    return pd.DataFrame([{"week": week, "player": player, "market": "player_receptions", "line": 9.5,
+                          "actual": actual, "price_over": -110, "price_under": -110, "event_id": ev}])
+
+
 def test_the_scorecard_grades_the_consensus_side_at_sleepers_price(tmp_path, monkeypatch):
     monkeypatch.setattr(persist, "RECORD_ROOT", tmp_path / "record")
-    rows = C.rows_from(_payload(), 2026, 4, "t")
-    # Sleeper at 4.5 vs consensus 3.5 (line off by 1 catch): the Under is favoured
-    settled = pd.DataFrame([
-        {"week": 4, "player": "Dalton Schultz", "market": "player_receptions", "line": 4.5, "actual": 3,
-         "price_over": -116, "price_under": -141, "event_id": "s1"},
-        # same line, Sleeper's no-vig Over 53.2% vs the consensus 48.4%: price off, Under favoured
-        {"week": 4, "player": "Dalton Schultz", "market": "player_receptions", "line": 3.5, "actual": 5,
-         "price_over": -125, "price_under": 105, "event_id": "s2"}])
-    b = scorecard.books_rows(settled, rows)
-    assert list(b.kind) == ["line off", "price off"]
+    rows = C.rows_from(_payload(), 2026, 4, SNAP)
+    # Sleeper at 4.5 vs consensus 3.5 (line off by 1 catch), quoted 3 minutes before the snapshot:
+    # the Under is favoured and wins on 3 catches at Sleeper's -141
+    b = scorecard.books_rows(_settled(3), rows, _quote(4.5, -116, -141, "2026-10-04T14:57:00Z"))
+    assert list(b.kind) == ["line off"] and b.side.iloc[0] == "Under"
     assert bool(b.won.iloc[0]) is True and b.pnl.iloc[0] == pytest.approx(10000 / 141)
-    assert bool(b.won.iloc[1]) is False and b.pnl.iloc[1] == -100.0
+    # same line, Sleeper's no-vig Over 53.2% vs the consensus 48.4%: price off, Under favoured, loses on 5
+    b = scorecard.books_rows(_settled(5), rows, _quote(3.5, -125, 105, "2026-10-04T15:04:00Z"))
+    assert list(b.kind) == ["price off"] and bool(b.won.iloc[0]) is False and b.pnl.iloc[0] == -100.0
     C.compare_path(2026, 4).parent.mkdir(parents=True)
     C.compare_path(2026, 4).write_text("\n".join(json.dumps(r) for r in rows), encoding="utf-8")
-    md = "\n".join(scorecard.books_section(settled, 2026))
+    persist.lines_path(2026).parent.mkdir(parents=True)
+    persist.lines_path(2026).write_text("\n".join(json.dumps(q) for q in _quote(4.5, -116, -141, SNAP)),
+                                        encoding="utf-8")
+    md = "\n".join(scorecard.books_section(_settled(3), 2026))
     assert "| line off | 1 | 1 | 100.0% |" in md and "no verdict yet" in md
 
 
-def test_one_bet_per_sleeper_line_and_no_price_from_mismatched_lines():
-    rows = C.rows_from(_payload(), 2026, 4, "t")
-    dup = pd.DataFrame([{"week": 4, "player": "Dalton Schultz", "market": "player_receptions", "line": 4.5,
-                         "actual": 3, "price_over": -116, "price_under": -141, "event_id": "s1"}] * 2)
-    assert len(scorecard.books_rows(dup, rows)) == 1, "two pricing models' calls on one line are one bet"
+def test_only_the_sleeper_line_at_the_snapshot_counts():
+    """The defect behind DECISIONS #252: Swift's Thursday 61.5 was graded against the books' Sunday
+    83.5, though Sleeper itself had moved to 83.5 by then. The quote nearest the snapshot, within
+    BOOKS_SAME_TIME_MIN, is the one compared; an older line is not a bet anyone could place."""
+    rows = C.rows_from(_payload(), 2026, 4, SNAP)
+    old_and_now = _quote(1.5, -130, -130, "2026-10-01T19:45:00Z") + _quote(3.5, -110, -120, "2026-10-04T14:58:00Z")
+    assert scorecard.books_rows(_settled(5), rows, old_and_now).empty, "Sleeper agreed with the books at the snapshot"
+    # only the stale quote exists: nothing is graded
+    assert scorecard.books_rows(_settled(5), rows, _quote(1.5, -130, -130, "2026-10-01T19:45:00Z")).empty
+    # 16 minutes out is outside the window, 15 is inside
+    assert scorecard.books_rows(_settled(5), rows, _quote(4.5, -116, -141, "2026-10-04T15:16:00Z")).empty
+    assert len(scorecard.books_rows(_settled(5), rows, _quote(4.5, -116, -141, "2026-10-04T15:15:00Z"))) == 1
+    # a quote with one side only is not a price
+    assert scorecard.books_rows(_settled(3), rows, _quote(4.5, -116, -141, SNAP)[:1]).empty
+
+
+def test_one_bet_per_player_market_and_no_result_no_bet():
+    rows = C.rows_from(_payload(), 2026, 4, SNAP)
+    # the same player under two pricing models is two settled rows; still one bet
+    two = pd.concat([_settled(3), _settled(3)])
+    assert len(scorecard.books_rows(two, rows, _quote(4.5, -116, -141, SNAP))) == 1
+    # no settled result (did not play, or not settled yet): not graded, never a loss
+    assert scorecard.books_rows(_settled(float("nan")), rows, _quote(4.5, -116, -141, SNAP)).empty
+    assert scorecard.books_rows(_settled(3, player="Someone Else"), rows, _quote(4.5, -116, -141, SNAP)).empty
+
+
+def test_no_price_from_mismatched_lines():
+    rows = C.rows_from(_payload(), 2026, 4, SNAP)
     split = [dict(r) for r in rows]
     for r in split:
         if r["book"] == "fanduel":
             r["line"] = 4.5
     cons = scorecard.books_consensus(split)
-    assert cons[(4, "dalton schultz", "player_receptions")] == (4.0, None)
+    line, p, when = cons[(4, "Houston Texans", "Dallas Cowboys", "dalton schultz", "player_receptions")]
+    assert (line, p) == (4.0, None) and when == scorecard._utc(SNAP)
+
+
+def test_same_name_in_two_games_stays_apart():
+    rows = C.rows_from(_payload(), 2026, 4, SNAP)
+    other = [dict(q, home_team="B", away_team="A", event_id="s9") for q in _quote(1.5, -130, -130, SNAP)]
+    # the other game's Dalton Schultz has no book consensus and his own result: he is never mixed in
+    two = pd.concat([_settled(3), _settled(0, ev="s9")])
+    b = scorecard.books_rows(two, rows, _quote(4.5, -116, -141, SNAP) + other)
+    assert len(b) == 1 and b.line.iloc[0] == 4.5 and b.actual.iloc[0] == 3
+
+
+def test_unreadable_rows_are_skipped_and_counted(tmp_path, monkeypatch):
+    monkeypatch.setattr(persist, "RECORD_ROOT", tmp_path / "record")
+    rows = C.rows_from(_payload(), 2026, 4, SNAP)
+    C.compare_path(2026, 4).parent.mkdir(parents=True)
+    C.compare_path(2026, 4).write_text("\n".join(json.dumps(r) for r in rows), encoding="utf-8")
+    persist.lines_path(2026).parent.mkdir(parents=True)
+    bad = dict(_quote(4.5, -116, -141, SNAP)[0], point=None)
+    persist.lines_path(2026).write_text("\n".join([json.dumps(q) for q in _quote(4.5, -116, -141, SNAP)]
+                                                  + [json.dumps(bad), '{"truncated']), encoding="utf-8")
+    md = "\n".join(scorecard.books_section(_settled(3), 2026))
+    assert "| line off | 1 | 1 | 100.0% |" in md
+    assert "Skipped as unreadable: 1 Sleeper quotes, 1 unreadable lines." in md
+    assert "1 player-markets with a DraftKings/FanDuel consensus; 1 with a Sleeper quote" in md

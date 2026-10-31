@@ -40,3 +40,24 @@ discrepancies, net per $100 is above zero with a game-clustered 95% interval
 that excludes zero. Until then the scorecard shows the running numbers and
 says the sample is too small. Line-off and price-off are reported separately
 and pooled.
+
+## Amendment, 2026-10-30 (DECISIONS #252): the Sleeper line at the time of the snapshot
+
+Made after the running numbers had been read (111 bets, +5.2 per $100), so it is a fix to a
+defect, not a second look at the rule. The definitions above say "for each settled Sleeper call";
+a call is the engine's last decision per pricing model, so a model that stopped running mid-week
+left its Thursday line in the comparison against the books' Sunday snapshot. D'Andre Swift, week 5:
+the call was 61.5, logged Thursday; the books said 83.5 on Sunday, and Sleeper itself said 83.5 at
+that moment. 56 of the 111 bets compared lines taken 24 hours or more apart.
+
+The comparison now reads Sleeper's own quote nearest the book snapshot from the line archive
+(both sides of one line from one retrieval, within 15 minutes; in weeks 4-8, 1,574 of 1,903
+consensus keys had one, all within 15 minutes, and the next nearest was over an hour away). One
+bet per player and market; the result is the player's settled stat; a player without one is not
+graded. The thresholds, the favoured side, the grading and the reading rule are unchanged.
+Re-read on the record through week 7: 60 bets, 44 won (73.3%) against 65.2% to break even,
++12.1 per $100 (pooled 95% range -1.5 to +25.6); 58 of the 60 are receptions lines. A player
+the engine did not price has no settled stat and is not graded (1,273 of the 1,574 same-time
+keys had one). The archive keeps only a line's latest retrieval, so a line re-quoted unchanged
+well after the snapshot drops out while one that later moved stays: 5 of the 60 bets are lines
+Sleeper later moved, and without them the read is 55 bets, 40 won, +11.0.
