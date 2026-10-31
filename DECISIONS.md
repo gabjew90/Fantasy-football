@@ -9353,7 +9353,17 @@ one set of games.
   settled stat; no settled stat, no bet (a missing stat used to grade as a loss). Thresholds, sides,
   grading and the reading rule are unchanged; the pre-registration carries a dated amendment.
 - **Re-read through week 7:** 60 bets, 44 won (73.3%) against 65.2% needed, +12.1 per $100
-  (95% range -1.3 to +27.2), no verdict (the rule needs 200+). 58 of the 60 are receptions lines,
+  (pooled 95% range -1.5 to +25.6), no verdict (the rule needs 200+). 58 of the 60 are receptions lines,
   mostly where DraftKings and FanDuel disagree with each other by a catch and Sleeper prices the
   favoured side at -150 or worse; the 2 same-time yardage bets lost. The old figure (111, +5.2)
   is superseded.
+- **Code review (high), 8 findings.** Fixed: a malformed archive or comparison row is skipped and
+  counted, never a crash of the Tuesday scorecard; quotes and books are keyed by game (home and
+  away team) and the result by Sleeper's event id, so two players sharing a name stay apart; the
+  section prints its coverage (consensus, same-time quote, settled result); the documents quote
+  the pooled range; tests for each. Kept, with the reason: the archive keeps only a line's latest
+  retrieval (LINE_KEY has no time), so a line re-quoted unchanged after the snapshot drops out
+  and one that later moved stays -- measured, 5 of the 60 bets, without them 55 bets, 40 won,
+  +11.0; the exact fix (compare.py storing Sleeper's quote beside the books at capture) is a
+  follow-up. Players are joined by name because neither the Odds API rows nor the archive carry
+  a player ID; the game key narrows it.

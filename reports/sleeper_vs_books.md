@@ -56,4 +56,8 @@ consensus keys had one, all within 15 minutes, and the next nearest was over an 
 bet per player and market; the result is the player's settled stat; a player without one is not
 graded. The thresholds, the favoured side, the grading and the reading rule are unchanged.
 Re-read on the record through week 7: 60 bets, 44 won (73.3%) against 65.2% to break even,
-+12.1 per $100 (95% range -1.3 to +27.2); 58 of the 60 are receptions lines.
++12.1 per $100 (pooled 95% range -1.5 to +25.6); 58 of the 60 are receptions lines. A player
+the engine did not price has no settled stat and is not graded (1,273 of the 1,574 same-time
+keys had one). The archive keeps only a line's latest retrieval, so a line re-quoted unchanged
+well after the snapshot drops out while one that later moved stays: 5 of the 60 bets are lines
+Sleeper later moved, and without them the read is 55 bets, 40 won, +11.0.

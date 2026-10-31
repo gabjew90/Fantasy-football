@@ -87,14 +87,15 @@ SNAP = "2026-10-04T15:00:00Z"
 def _quote(line, po, pu, at, player="Dalton Schultz", week=4, ev="s1"):
     """Sleeper's two sides of one line from one retrieval, as the line archive holds them."""
     base = {"week": week, "player": player, "market": "player_receptions", "point": line,
-            "retrieved_at_utc": at, "event_id": ev, "bookmaker": "sleeper"}
+            "retrieved_at_utc": at, "event_id": ev, "bookmaker": "sleeper",
+            "home_team": EVENT["home_team"], "away_team": EVENT["away_team"]}
     return [dict(base, outcome="Over", price_american=po), dict(base, outcome="Under", price_american=pu)]
 
 
-def _settled(actual, player="Dalton Schultz", week=4):
-    # the scorecard's calls: only the player's result is read from them now
+def _settled(actual, player="Dalton Schultz", week=4, ev="s1"):
+    # the scorecard's calls: only the player's result in that game is read from them now
     return pd.DataFrame([{"week": week, "player": player, "market": "player_receptions", "line": 9.5,
-                          "actual": actual, "price_over": -110, "price_under": -110, "event_id": "x"}])
+                          "actual": actual, "price_over": -110, "price_under": -110, "event_id": ev}])
 
 
 def test_the_scorecard_grades_the_consensus_side_at_sleepers_price(tmp_path, monkeypatch):
@@ -150,5 +151,29 @@ def test_no_price_from_mismatched_lines():
         if r["book"] == "fanduel":
             r["line"] = 4.5
     cons = scorecard.books_consensus(split)
-    line, p, when = cons[(4, "dalton schultz", "player_receptions")]
+    line, p, when = cons[(4, "Houston Texans", "Dallas Cowboys", "dalton schultz", "player_receptions")]
     assert (line, p) == (4.0, None) and when == scorecard._utc(SNAP)
+
+
+def test_same_name_in_two_games_stays_apart():
+    rows = C.rows_from(_payload(), 2026, 4, SNAP)
+    other = [dict(q, home_team="B", away_team="A", event_id="s9") for q in _quote(1.5, -130, -130, SNAP)]
+    # the other game's Dalton Schultz has no book consensus and his own result: he is never mixed in
+    two = pd.concat([_settled(3), _settled(0, ev="s9")])
+    b = scorecard.books_rows(two, rows, _quote(4.5, -116, -141, SNAP) + other)
+    assert len(b) == 1 and b.line.iloc[0] == 4.5 and b.actual.iloc[0] == 3
+
+
+def test_unreadable_rows_are_skipped_and_counted(tmp_path, monkeypatch):
+    monkeypatch.setattr(persist, "RECORD_ROOT", tmp_path / "record")
+    rows = C.rows_from(_payload(), 2026, 4, SNAP)
+    C.compare_path(2026, 4).parent.mkdir(parents=True)
+    C.compare_path(2026, 4).write_text("\n".join(json.dumps(r) for r in rows), encoding="utf-8")
+    persist.lines_path(2026).parent.mkdir(parents=True)
+    bad = dict(_quote(4.5, -116, -141, SNAP)[0], point=None)
+    persist.lines_path(2026).write_text("\n".join([json.dumps(q) for q in _quote(4.5, -116, -141, SNAP)]
+                                                  + [json.dumps(bad), '{"truncated']), encoding="utf-8")
+    md = "\n".join(scorecard.books_section(_settled(3), 2026))
+    assert "| line off | 1 | 1 | 100.0% |" in md
+    assert "Skipped as unreadable: 1 Sleeper quotes, 1 unreadable lines." in md
+    assert "1 player-markets with a DraftKings/FanDuel consensus; 1 with a Sleeper quote" in md
