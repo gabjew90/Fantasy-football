@@ -195,7 +195,7 @@
   "props/engine/scripts/td_model.py": "7c1635bbf515b4316f14771b177363a9f82a1ba7ad3393e479cd2dce26a25724",
   "props/engine/scripts/td_v1.py": "bb4ef62e525c948889ef4e45f6c41564dcc7bed2a97b3d4def0792848f12c485",
   "props/engine_version.py": "c950542e1f4b486b02a5a456941003f195659e1e34bad934dde7a4b6a74db656",
-  "props/guard.py": "652dd0b1a0c1eaa9927a84bcb80e6ba48ff9de50ae8e771cdad51411cf82b121",
+  "props/guard.py": "18c0b90cd7fc4eac050c54186022467ca24c3433c8b7e8341193e4cdbabeb0df",
   "props/journal.py": "a1ddc8895b57ea48cdb1e81cc71b4d2c63d52fcc5de4623deaffed8c0946b8cf",
   "props/persist.py": "d1d164af25eabb3ae6dbbae24f018487f7575b554689ad9b3eceb40985e8a392",
   "props/settle.py": "969f0cb3a0dd3f2f82c588ea642d83b41f50bbe3074d07397c1eebf191c6f901",
@@ -207,6 +207,6 @@
   "scripts/bootstrap.py": "8c6c428d7b66fde19ea8894d5124a0c182ba3f9719db6031f4904459e3b8cdd7",
   "scripts/release.py": "0bdf24c73b040deb17c649e9d7badb9a71edaac6a6044f237be6e0e246ee804e"
  },
- "sha256": "c827daa825f43056e2ae105547dfd2bac636521df36e7b817900016dd8ebff8e",
- "tag": "nfl-v1.87"
+ "sha256": "36d5e51b57146d9eed55703ea2bca44a32e88647e5cb81785d4288480e1a6d71",
+ "tag": "nfl-v1.88"
 }

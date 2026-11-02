@@ -40,13 +40,18 @@ def _FrozenDatetime(now):  # noqa: N802 - it stands in for a class
 
 
 def _run_guard(mod) -> dict:
-    """main()'s GITHUB_OUTPUT lines, as a dict."""
+    """main()'s GITHUB_OUTPUT lines, as a dict, for a tick whose work succeeds: the workflow then
+    writes the weekly marker (props/relay.py), which a later tick reads."""
     import contextlib
     import io
     buf = io.StringIO()
     with contextlib.redirect_stdout(buf):
         assert mod.main() == 0
-    return dict(line.split("=", 1) for line in buf.getvalue().splitlines() if "=" in line)
+    out = dict(line.split("=", 1) for line in buf.getvalue().splitlines() if "=" in line)
+    kind = "settle" if out["mode"] == "settle" else "open" if out["snapshot_type"] == "open" else None
+    if kind:
+        mod.mark_period(kind, mod.period_key(mod.dt.datetime.now(mod.dt.timezone.utc)))
+    return out
 
 
 # ------------------------------------------------------------------- clock

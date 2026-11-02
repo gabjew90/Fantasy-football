@@ -30,6 +30,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import calls as calls_mod  # noqa: E402
 import blend  # noqa: E402
+import guard  # noqa: E402
 import journal  # noqa: E402
 import persist  # noqa: E402
 
@@ -117,6 +118,12 @@ def engine_label(df: pd.DataFrame) -> str:
     return h[:12] if h else "unidentified engine"
 
 
+def _far_from_kickoff(row: dict) -> bool:
+    """A row taken outside the close window. A row with no usable kickoff time cannot be judged and stands."""
+    minutes = row.get("minutes_to_kickoff")
+    return isinstance(minutes, (int, float)) and minutes > guard.CLOSE_WINDOW_MIN
+
+
 def clv_table(season: int) -> pd.DataFrame:
     """Line movement between the decision snapshot and the closing snapshot."""
     rows = []
@@ -141,7 +148,9 @@ def clv_table(season: int) -> pd.DataFrame:
     # deciding engine still gets its CLV. It must be the LAST close -- see
     # calls.last_per on why the first would misreport an early-window run.
     market_key = tuple(f for f in calls_mod.CALL_KEY if f != "model_id")
-    closes = calls_mod.last_per(rows, "close", market_key)
+    # Rows through week 8 were labelled per run (record_run.row_snapshot_type), so a game hours from
+    # kickoff can carry `close`; the record is not rewritten, so that label is judged here.
+    closes = calls_mod.last_per([r for r in rows if not _far_from_kickoff(r)], "close", market_key)
     if not decisions or not closes:
         return pd.DataFrame()
 

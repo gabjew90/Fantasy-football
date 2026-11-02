@@ -49,6 +49,9 @@ except Exception:  # noqa: BLE001 — no tzdata on the host (rare; Windows witho
 
 GAMES_URL = "https://raw.githubusercontent.com/nflverse/nfldata/master/data/games.csv"
 CACHE = Path(__file__).resolve().parent / ".cache"
+# COMMITTED, NOT CACHED. This script runs before the workflow restores the Actions cache, so a marker
+# kept in .cache was never seen and every tick in the settle span settled again.
+MARKERS = Path(__file__).resolve().parent / "record" / "ran"
 CAPTURE_LEAD_MIN = int(os.environ.get("PROPS_CAPTURE_LEAD_MIN", "360"))
 # The Thursday opening sweep: 22:00-24:00 UTC, i.e. Thursday evening
 # US Eastern, before the week's first kickoff.
@@ -130,7 +133,7 @@ def _soonest_week(games: list[dict], now: dt.datetime) -> int | None:
 
 
 def _period_marker(kind: str, key: str) -> Path:
-    return CACHE / f"ran_{kind}_{key}"
+    return MARKERS / f"{kind}_{key}"
 
 
 def period_done(kind: str, key: str) -> bool:
@@ -145,16 +148,25 @@ def mark_period(kind: str, key: str) -> None:
     the wrong one: GitHub fires this repo's crons a median 128 minutes late
     (DECISIONS #70), which is exactly why the window is two hours. So the
     window keeps absorbing the lag and the marker stops the other seven
-    ticks inside it from re-settling, re-scoring and re-pushing. The marker
-    lives in the Actions cache, so a cache miss costs one duplicate run
-    rather than eight.
+    ticks inside it from re-settling, re-scoring and re-pushing. Written by
+    relay.py after the work succeeds, so a failed run is retried, and
+    committed with the record.
     """
     try:
-        CACHE.mkdir(parents=True, exist_ok=True)
-        _period_marker(kind, key).write_text(dt.datetime.now(dt.timezone.utc).isoformat(),
-                                             encoding="utf-8")
+        marker = _period_marker(kind, key)
+        marker.parent.mkdir(parents=True, exist_ok=True)
+        marker.write_text(dt.datetime.now(dt.timezone.utc).isoformat(), encoding="utf-8")
     except OSError:
         pass          # a marker we cannot write is a duplicate run, not a failure
+
+
+def period_key(now: dt.datetime) -> str:
+    iso = now.isocalendar()
+    return f"{iso[0]}-W{iso[1]:02d}"
+
+
+def season_of(now: dt.datetime) -> int:
+    return now.year if now.month >= 3 else now.year - 1
 
 
 def in_settle_span(now: dt.datetime) -> bool:
@@ -194,11 +206,11 @@ def main() -> int:
     now = dt.datetime.now(dt.timezone.utc)
     forced = bool(os.environ.get("FORCED"))
     mode = (os.environ.get("PROPS_MODE") or "").strip() or None
-    season = int(os.environ.get("PROPS_SEASON") or 0) or (
-        now.year if now.month >= 3 else now.year - 1)
+    season = int(os.environ.get("PROPS_SEASON") or 0) or season_of(now)
 
-    # Explicit dispatch always runs; the operator has decided.
-    if forced and mode:
+    # Explicit dispatch always runs; the operator has decided. "auto" is the
+    # relay's dispatch (relay.py): it is judged like a scheduled tick.
+    if forced and mode and mode != "auto":
         week = os.environ.get("PROPS_WEEK") or ""
         if not week:
             try:
@@ -218,12 +230,9 @@ def main() -> int:
     # both outside 14:00-16:00, so week 2 was never graded. The per-week
     # marker already stops a second run; the span ends Thursday 12:00 UTC so a
     # missed settle cannot collide with the Thursday opening sweep.
-    iso = now.isocalendar()
-    settle_key = f"{iso[0]}-W{iso[1]:02d}"
-    settle_due = in_settle_span(now) and not period_done("settle", settle_key)
+    settle_due = in_settle_span(now) and not period_done("settle", period_key(now))
 
     def settle() -> int:
-        mark_period("settle", settle_key)
         emit(run="true", mode="settle", season=season, week=0,
              snapshot_type="decision")
         return 0
@@ -251,11 +260,8 @@ def main() -> int:
     # hours wide because GitHub fires these crons late, and the marker is
     # what stops the other seven ticks inside it.
     if now.weekday() == 3 and OPEN_FROM_HOUR <= now.hour < OPEN_TO_HOUR:
-        iso = now.isocalendar()
-        key = f"{iso[0]}-W{iso[1]:02d}"
-        if not period_done("open", key):
+        if not period_done("open", period_key(now)):
             week = _soonest_week(games, now) or week_from_calendar(now, season)
-            mark_period("open", key)
             emit(run="true", mode="capture", season=season, week=week,
                  snapshot_type="open")
             return 0
