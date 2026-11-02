@@ -42,14 +42,17 @@ JOINT_NUM = {"p_a", "p_b", "p_indep", "p_joint", "p_joint_plain", "p_joint_shift
              "p_joint_copula"}
 
 
-def read_joint(path: Path, snapshot_type: str, game: str, stamp: dict) -> list[dict]:
+def read_joint(path: Path, snapshot_type: str, game: str, stamp: dict,
+               kickoff: dict[str, str] | None = None) -> list[dict]:
     """Layer-3 joint prices (shadow) as record rows."""
     rows = []
     with path.open(encoding="utf-8") as fh:
         for raw in csv.DictReader(fh):
             row = {k: (float(v) if k in JOINT_NUM and v not in ("", None) else v) for k, v in raw.items()}
             row["season"], row["week"] = int(row["season"]), int(row["week"])
-            row.update(stamp, snapshot_type=snapshot_type, game=game, engine_run_file=path.name)
+            row.update(stamp, game=game, engine_run_file=path.name)
+            row["snapshot_type"] = row_snapshot_type(snapshot_type, minutes_to_kickoff(
+                row.get("logged_at_utc"), (kickoff or {}).get(str(row.get("event_id") or ""))))
             rows.append(row)
     return rows
 
@@ -130,6 +133,7 @@ def read_shadow_log(path: Path, snapshot_type: str, game: str,
                 row["commence_time"] = when
                 row["minutes_to_kickoff"] = minutes_to_kickoff(
                     row.get("logged_at_utc"), when)
+                row["snapshot_type"] = row_snapshot_type(snapshot_type, row["minutes_to_kickoff"])
             rows.append(row)
     return rows
 
@@ -174,6 +178,16 @@ def minutes_to_kickoff(logged_at: str | None, commence: str | None) -> float | N
         return round((b - a).total_seconds() / 60.0, 1)
     except (ValueError, TypeError):
         return None
+
+
+def row_snapshot_type(run_type: str, minutes: float | None) -> str:
+    """The snapshot type of ONE call. The guard labels a run `close` when its SOONEST kickoff is inside
+    the window, which stamped every later game in that run `close` too: CHI@SEA at 1,708 minutes before
+    kickoff in week 8, 14 games labelled against 4 true in week 7. Such a row was a decision, so settle
+    now grades it as one. Without a kickoff time, the run's type stands (as quote_snapshot_type does)."""
+    if run_type != "close" or minutes is None:
+        return run_type
+    return "close" if minutes <= guard.CLOSE_WINDOW_MIN else "decision"
 
 
 def _utc(v):
@@ -297,7 +311,7 @@ def main() -> int:
     for f in sorted(p for p in src.iterdir() if JOINT_RE.search(p.name)):
         m = JOINT_RE.search(f.name)
         joint_by_week.setdefault((int(m.group(1)), int(m.group(2))), []).extend(
-            read_joint(f, args.snapshot_type, f"{m.group(3)}@{m.group(4)}", stamp))
+            read_joint(f, args.snapshot_type, f"{m.group(3)}@{m.group(4)}", stamp, kickoff))
     for (season, week), rows in sorted(joint_by_week.items()):
         summaries.append(persist.write_joint(season, week, rows))
 

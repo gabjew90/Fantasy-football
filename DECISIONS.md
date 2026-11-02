@@ -9367,3 +9367,49 @@ one set of games.
   +11.0; the exact fix (compare.py storing Sleeper's quote beside the books at capture) is a
   follow-up. Players are joined by name because neither the Odds API rows nor the archive carry
   a player ID; the game key narrows it.
+
+## 2026-11-02 (253) -- closing captures are timed by a relay, labels are per game, weekly markers work
+
+- **What was found (the user asked how logging and grading were going; read from the record on
+  2026-11-02):** grading was on track and every run was green, but three things were wrong.
+  - **Too few closing lines. Root cause: weak rule.** The record assumed the 15-minute cron. GitHub
+    starts it about every four and a half hours (median gap 268 minutes across 199 ticks, longest
+    582), so games with a quote inside the last hour numbered 9/15, 3/16, 14/16, 4/15, 4/14, 4/14
+    for weeks 2-7 and 3 of the 13 played in week 8.
+  - **`close` on rows hours from kickoff. Root cause: code.** The guard labels a run by its soonest
+    kickoff and record_run copied that onto every prediction row, though #226 had already fixed it
+    for quotes: CHI@SEA at 1,708 minutes in week 8, 14 games labelled against 4 true in week 7.
+  - **Settle and the opening sweep ran on every tick in their span. Root cause: code.** The guard
+    reads its marker before the workflow restores the cache that holds it, so it never saw one: 9
+    extra settle commits 10/27-10/29 and 7 the week before.
+- **The fixes (the user's go, 2026-11-02):**
+  - **props/relay.py and the `close-relay` job.** After each tick that succeeded, a job sleeps until
+    the next kickoff is 45 minutes away and dispatches the workflow with mode=auto, which the guard
+    judges like a scheduled tick. That run relays again, so a slate carries itself. A kickoff further
+    off than one sleep (340 minutes; job limit 350) gets a bridging hop, out to 16 hours, which is one
+    sleep plus the longest gap. Sleeping costs nothing: the repo is public.
+  - **record_run.row_snapshot_type.** A `close` run's row more than 60 minutes from its own kickoff
+    is a `decision`. Without a kickoff time the run's type stands, as for quotes.
+  - **Markers committed under props/record/ran, written after the work succeeds.** A failed settle
+    or sweep is retried. Settle's marker waits until the latest week's games with a decision are all
+    graded and none is pending, because reruns changed the graded file on 10/06 and 10/07.
+- **The record is not rewritten; the scorecard's closing-line section judges the old labels when it
+  reads them.** Measured through week 8 so far: 2,199 pairs on 60 games became 1,525 on 38, moved our
+  way 17.8% to 16.9%, mean move +0.094 to +0.176. All closing-line figures before this entry include
+  rows that were not closing lines.
+- **Changes to what is graded, from week 9 on.** A row now labelled `decision` can be a game's last
+  decision, so its call moves later. Applied to weeks 2-8 for measurement only, 27 of 5,397 calls
+  would take a later snapshot and 204 calls that are not graded today would be (203 of them in week
+  4). Weeks through 8 stay as they are, so the first label-gate review is unaffected.
+- **Code review (high), 10 findings.** Fixed: only a `close` run counts as having taken a closing line
+  (an opening sweep 45 minutes out did not); a game with no decision row cannot hold settle open; a
+  broken relay cannot turn a run red (continue-on-error); the relay's group is per branch; a bad
+  minutes value cannot crash the scorecard; the lock bump. Kept, with the reason: journal rows logged
+  after the Tuesday settle now wait for the next one, or an operator dispatch of mode=settle (reruns
+  through Thursday were an accident of the marker bug, and bets are normally logged before grading);
+  mark reads the current season, which only matters for a forced settle of another season and is
+  harmless; a replaced relay shows its run as cancelled, which notify.yml ignores; relay keeps its own
+  small timestamp parser so it stays stdlib-only and off the release list.
+- **Not validated yet.** Whether GitHub dispatches promptly enough is measured on week 9: the count of
+  games with a quote inside the last hour should be close to all of them. If the relay falls short,
+  this entry is where to start.

@@ -328,6 +328,30 @@ def test_a_settled_file_without_is_call_is_read_not_crashed(record, capsys):
 
 # ---------------------------------------------------------------------- CLV
 
+def test_clv_ignores_a_close_label_hours_from_kickoff(record):
+    """Rows through week 8 were labelled per run, so a game hours out can carry `close`: that is not
+    its closing line. A row with no kickoff time cannot be judged and stands."""
+    _write(record, [
+        _pred(),
+        _pred(snapshot_type="close", line=56.5, minutes_to_kickoff=273.0,
+              logged_at_utc="2026-09-20T19:55:00Z"),
+    ])
+    assert scorecard.clv_table(2026).empty, "no true close, no CLV row"
+    _write(record, [
+        _pred(),
+        _pred(snapshot_type="close", line=57.5, minutes_to_kickoff=45.0,
+              logged_at_utc="2026-09-20T15:00:00Z"),
+        _pred(snapshot_type="close", line=56.5, minutes_to_kickoff=273.0,
+              logged_at_utc="2026-09-20T19:55:00Z"),
+    ])
+    assert scorecard.clv_table(2026).iloc[0]["line_close"] == 57.5
+    _write(record, [_pred(), _pred(snapshot_type="close", line=56.5, logged_at_utc="2026-09-20T19:55:00Z")])
+    assert scorecard.clv_table(2026).iloc[0]["line_close"] == 56.5
+    _write(record, [_pred(), _pred(snapshot_type="close", line=56.5, minutes_to_kickoff="bad",
+                                   logged_at_utc="2026-09-20T19:55:00Z")])
+    assert scorecard.clv_table(2026).iloc[0]["line_close"] == 56.5, "a bad value never crashes the scorecard"
+
+
 def test_clv_pairs_one_call_with_one_close(record):
     """The fan-out this prevents: the old join was on seven fields excluding
     `line`, so two decision rows each paired with every close row."""

@@ -3,8 +3,8 @@
 # `manager-state` group were retired on 2026-10-08 (DECISIONS #212); this is
 # the only scheduled workflow.
 #
-# Three jobs, all driven off one cheap stdlib-only guard so ticks outside a
-# kickoff window exit in seconds and cost almost no free-tier minutes:
+# Three kinds of work, all driven off one cheap stdlib-only guard so ticks outside
+# a kickoff window exit in seconds and cost almost no free-tier minutes:
 #   capture  score every game that kicks off soon; inside 60 minutes of kickoff
 #            the snapshot is `close`, earlier it is `decision`. The closing
 #            snapshot is the one CLV depends on and the one a chat session
@@ -12,6 +12,8 @@
 #   settle   Tuesday, after nflverse publishes weekly stats; grades every
 #            recorded call against what actually happened.
 #   scorecard rebuilds record/scorecard.md from the settled rows.
+# GitHub fires the cron about every four and a half hours, not every 15 minutes,
+# so the close-relay job times the closing captures (props/relay.py).
 #
 # The engine reads prices from Sleeper (no key, no quota) by default.
 # ODDS_API_KEY is passed only so a DK/FD closing capture is possible when the
@@ -22,7 +24,7 @@ on:
   workflow_dispatch:
     inputs:
       mode:
-        description: capture | settle | scorecard
+        description: capture | settle | scorecard | auto (judged like a scheduled tick)
         required: false
         default: capture
       season:
@@ -43,14 +45,15 @@ on:
 permissions:
   contents: write
 
-concurrency:
-  group: props-record
-  cancel-in-progress: false
-
 jobs:
   tick:
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    concurrency:
+      group: props-record
+      cancel-in-progress: false
+    outputs:
+      snapshot_type: ${{ steps.guard.outputs.snapshot_type }}
     steps:
       - uses: actions/checkout@v4
 
@@ -185,6 +188,11 @@ jobs:
         if: steps.guard.outputs.run == 'true' && steps.guard.outputs.mode != 'capture'
         run: python props/scorecard.py --season ${{ steps.guard.outputs.season }}
 
+      - name: mark the weekly work done
+        # after it succeeded, so a failed settle or opening sweep runs again on the next tick
+        if: steps.guard.outputs.run == 'true' && (steps.guard.outputs.mode == 'settle' || steps.guard.outputs.snapshot_type == 'open')
+        run: python3 props/relay.py mark ${{ steps.guard.outputs.mode == 'settle' && 'settle' || 'open' }}
+
       - name: commit record
         if: always() && steps.guard.outputs.run == 'true'
         run: |
@@ -205,3 +213,37 @@ jobs:
         run: |
           echo "::error title=unpinned engine::the capture ran main's engine, not ${{ steps.engine.outputs.tag }}; rows are stamped main-fallback"
           exit 1
+
+  close-relay:
+    # Only after a tick that succeeded: a failing capture must not chain into more failing runs, each
+    # opening an [ACT NOW] issue. Its own group, so the sleep never holds a capture back, and the newest
+    # relay replaces an older one, so two ticks cannot start two hops for one kickoff. A replaced relay
+    # shows its run as cancelled, which notify.yml ignores; a relay that breaks cannot turn the run red,
+    # because the capture is already committed and the cron ticks still run.
+    needs: tick
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 350
+    continue-on-error: true
+    concurrency:
+      group: props-relay-${{ github.ref_name }}
+      cancel-in-progress: true
+    permissions:
+      contents: read
+      actions: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: sleep until the next closing capture, then start it
+        env:
+          GH_TOKEN: ${{ github.token }}
+          # only a `close` run took a closing line; an opening sweep or an operator's capture did not
+          CLOSE_CAPTURED_AT: ${{ needs.tick.outputs.snapshot_type == 'close' && github.run_started_at || '' }}
+        run: |
+          WAIT=$(python3 props/relay.py wait)
+          if [ -n "$WAIT" ]; then
+            echo "next hop in $WAIT seconds"
+            sleep "$WAIT"
+            gh workflow run props.yml --ref main -f mode=auto \
+              || echo "::warning::the relay could not start the capture; the cron ticks still run"
+          fi
