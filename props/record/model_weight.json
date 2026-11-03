@@ -1,20 +1,43 @@
 {
  "current": {
+  "at_review": {
+   "n_calls": 1579,
+   "profit": {
+    "estimated": true,
+    "hi": 4.86,
+    "level": 0.9833333333333333,
+    "lo": -22.65,
+    "n_bets": 387,
+    "n_games": 56,
+    "net_per_100": -9.22
+   },
+   "profit_ok": false,
+   "week": 8,
+   "weight": {
+    "estimated": true,
+    "hi": 0.565,
+    "level": 0.9833333333333333,
+    "lo": -0.71,
+    "w_model": -0.056
+   },
+   "weight_ok": false
+  },
   "engine": "props-v1.67",
   "estimated": true,
   "gate_open": false,
-  "hi": 0.793,
+  "hi": 0.447,
   "level": 0.95,
-  "lo": -0.473,
+  "lo": -0.589,
   "model_id": "eec5280951ccd6d79ad81be4fa83cfb857196ce17afd726aecbac37513543d29",
-  "n_calls": 1181,
-  "next_review": 8,
-  "review_week": null,
-  "w_model": 0.188,
+  "n_calls": 1579,
+  "next_review": 12,
+  "review_week": 8,
+  "w_model": -0.056,
   "weeks": [
    5,
    6,
-   7
+   7,
+   8
   ]
  },
  "engines": [
@@ -160,44 +183,90 @@
    ]
   },
   {
+   "at_review": {
+    "n_calls": 1579,
+    "profit": {
+     "estimated": true,
+     "hi": 4.86,
+     "level": 0.9833333333333333,
+     "lo": -22.65,
+     "n_bets": 387,
+     "n_games": 56,
+     "net_per_100": -9.22
+    },
+    "profit_ok": false,
+    "week": 8,
+    "weight": {
+     "estimated": true,
+     "hi": 0.565,
+     "level": 0.9833333333333333,
+     "lo": -0.71,
+     "w_model": -0.056
+    },
+    "weight_ok": false
+   },
    "engine": "props-v1.67",
    "estimated": true,
    "gate_open": false,
-   "hi": 0.793,
+   "hi": 0.447,
    "level": 0.95,
-   "lo": -0.473,
+   "lo": -0.589,
    "model_id": "eec5280951ccd6d79ad81be4fa83cfb857196ce17afd726aecbac37513543d29",
-   "n_calls": 1181,
-   "next_review": 8,
-   "review_week": null,
-   "w_model": 0.188,
+   "n_calls": 1579,
+   "next_review": 12,
+   "review_week": 8,
+   "w_model": -0.056,
    "weeks": [
     5,
     6,
-    7
+    7,
+    8
    ]
   }
  ],
  "pooled": {
+  "at_review": {
+   "n_calls": 3914,
+   "profit": {
+    "estimated": true,
+    "hi": -3.25,
+    "level": 0.9833333333333333,
+    "lo": -21.34,
+    "n_bets": 971,
+    "n_games": 104,
+    "net_per_100": -12.51
+   },
+   "profit_ok": false,
+   "week": 8,
+   "weight": {
+    "estimated": true,
+    "hi": 0.395,
+    "level": 0.9833333333333333,
+    "lo": -0.325,
+    "w_model": 0.03
+   },
+   "weight_ok": false
+  },
   "estimated": true,
   "gate_open": false,
-  "hi": 0.439,
+  "hi": 0.338,
   "level": 0.95,
-  "lo": -0.196,
-  "n_calls": 3516,
-  "next_review": 8,
-  "review_week": null,
-  "w_model": 0.117,
+  "lo": -0.284,
+  "n_calls": 3914,
+  "next_review": 12,
+  "review_week": 8,
+  "w_model": 0.03,
   "weeks": [
    2,
    3,
    4,
    5,
    6,
-   7
+   7,
+   8
   ]
  },
  "rule": "decided only at the week 8, 12, 18 reviews, on the calls through that week: labels return only when the whole 98.3% interval of the model's weight is above zero AND the top-tier calls' net per $100 at Sleeper's recorded prices has its whole 98.3% interval above zero (3 looks share one 5%)",
  "season": 2026,
- "updated_utc": "2026-10-29T11:48:31Z"
+ "updated_utc": "2026-11-03T19:18:16Z"
 }

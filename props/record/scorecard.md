@@ -1,6 +1,6 @@
 # Props scorecard — 2026
 
-4564 calls (5159 priced lines graded, so 595 superseded by a later line).
+5077 calls (5859 priced lines graded, so 782 superseded by a later line).
 
 **11 pricing models in the record (props-v1.3, props-v1.26, props-v1.0, props-v1.1, props-v1.31, props-v1.25, props-v1.7, props-v1.18, props-v1.28, props-v1.55, props-v1.67); they are not pooled.** Pass `--pool` to pool them explicitly.
 
@@ -20,20 +20,21 @@ The research board shows no bet labels. The gate is decided only at the reviews 
 | props-v1.18 | 292 | 3-3 | not estimated below 300 calls | none yet (first after week 8) | — | — | closed |
 | props-v1.28 | 395 | 4-4 | +0.520 (-0.215, +1.143) | none yet (first after week 8) | — | — | closed |
 | props-v1.55 | 305 | 5-5 | -0.015 (-0.950, +1.223) | none yet (first after week 8) | — | — | closed |
-| props-v1.67 (current) | 1181 | 5-7 | +0.188 (-0.473, +0.793) | none yet (first after week 8) | — | — | closed |
-| all models, pooled (context only) | 3516 | 2-7 | +0.117 (-0.196, +0.439) | none yet (first after week 8) | — | — | closed |
+| props-v1.67 (current) | 1579 | 5-8 | -0.056 (-0.589, +0.447) | week 8 (1579 calls) | -0.056 (-0.710, +0.565) | -9.2 (-22.6, +4.9), 387 bets | closed |
+| all models, pooled (context only) | 3914 | 2-8 | +0.030 (-0.284, +0.338) | week 8 (3914 calls) | +0.030 (-0.325, +0.395) | -12.5 (-21.3, -3.2), 971 bets | closed |
 
 ## Sleeper against DraftKings/FanDuel
 
-Not the model: when Sleeper's line or price sits off the DraftKings/FanDuel consensus, the side the consensus favours, bet at Sleeper's price (reports/sleeper_vs_books.md).
+Not the model: when Sleeper's line or price, quoted at the time of the DraftKings/FanDuel snapshot (within 15 minutes), sits off their consensus, the side the consensus favours, bet at Sleeper's price (reports/sleeper_vs_books.md; same-time since DECISIONS #252).
+
+Coverage: 2343 player-markets with a DraftKings/FanDuel consensus; 1937 with a Sleeper quote within 15 minutes of it; 1598 of those with a settled result (the engine priced the player).
 
 | Discrepancy | Bets | Won | Win rate | Break-even | Net per $100 (95% CI) |
 |---|---|---|---|---|---|
-| line off | 109 | 70 | 64.2% | 61.7% | +4.0 (-8.7, +14.2) |
-| price off | 2 | 2 | 100.0% | 58.6% | +70.8 (+nan, +nan) |
-| both, pooled | 111 | 72 | 64.9% | 61.6% | +5.2 (-6.0, +16.7) |
+| line off | 76 | 55 | 72.4% | 64.9% | +10.7 (-1.5, +23.6) |
+| both, pooled | 76 | 55 | 72.4% | 64.9% | +10.7 (-1.1, +24.1) |
 
-111 graded discrepancies: no verdict yet: the rule needs 200+ bets and an interval above zero.
+76 graded discrepancies: no verdict yet: the rule needs 200+ bets and an interval above zero.
 
 ## Engine props-v1.3
 
@@ -92,7 +93,7 @@ Those rows assume the teammate played. When he sat, they graded against a line p
 
 ### Closing line value
 
-365 calls have both snapshots. The line moved toward the call 11.0% of the time (mean move -0.04).
+233 calls have both snapshots. The line moved toward the call 14.2% of the time (mean move -0.03).
 
 Beating the close consistently is the signal that survives small samples. Winning without it is variance.
 
@@ -173,7 +174,7 @@ Those rows assume the teammate played. When he sat, they graded against a line p
 
 ### Closing line value
 
-393 calls have both snapshots. The line moved toward the call 19.8% of the time (mean move +0.18).
+368 calls have both snapshots. The line moved toward the call 19.6% of the time (mean move +0.17).
 
 Beating the close consistently is the signal that survives small samples. Winning without it is variance.
 
@@ -251,9 +252,7 @@ Those rows assume the teammate played. When he sat, they graded against a line p
 
 ### Closing line value
 
-24 calls have both snapshots. The line moved toward the call 33.3% of the time (mean move +0.04).
-
-Beating the close consistently is the signal that survives small samples. Winning without it is variance.
+No paired decision/close snapshots yet. CLV needs a closing capture inside 60 minutes of kickoff, and the scheduled runs fire too late to make one (speed is off by the user's choice); without it, closing-line value is unavailable and must not be estimated. The bet journal measures late-line value instead: each bet against the last line the capture logged before kickoff.
 
 ### Worth a look
 
@@ -321,9 +320,7 @@ Those rows assume the teammate played. When he sat, they graded against a line p
 
 ### Closing line value
 
-24 calls have both snapshots. The line moved toward the call 29.2% of the time (mean move -0.08).
-
-Beating the close consistently is the signal that survives small samples. Winning without it is variance.
+No paired decision/close snapshots yet. CLV needs a closing capture inside 60 minutes of kickoff, and the scheduled runs fire too late to make one (speed is off by the user's choice); without it, closing-line value is unavailable and must not be estimated. The bet journal measures late-line value instead: each bet against the last line the capture logged before kickoff.
 
 ### Worth a look
 
@@ -392,7 +389,7 @@ Those rows assume the teammate played. When he sat, they graded against a line p
 
 ### Closing line value
 
-52 calls have both snapshots. The line moved toward the call 15.4% of the time (mean move +0.38).
+25 calls have both snapshots. The line moved toward the call 20.0% of the time (mean move +0.92).
 
 Beating the close consistently is the signal that survives small samples. Winning without it is variance.
 
@@ -554,9 +551,7 @@ Those rows assume the teammate played. When he sat, they graded against a line p
 
 ### Closing line value
 
-17 calls have both snapshots. The line moved toward the call 23.5% of the time (mean move -0.35).
-
-Beating the close consistently is the signal that survives small samples. Winning without it is variance.
+No paired decision/close snapshots yet. CLV needs a closing capture inside 60 minutes of kickoff, and the scheduled runs fire too late to make one (speed is off by the user's choice); without it, closing-line value is unavailable and must not be estimated. The bet journal measures late-line value instead: each bet against the last line the capture logged before kickoff.
 
 ### Worth a look
 
@@ -696,7 +691,7 @@ Those rows assume the teammate played. When he sat, they graded against a line p
 
 ### Closing line value
 
-376 calls have both snapshots. The line moved toward the call 13.0% of the time (mean move +0.10).
+351 calls have both snapshots. The line moved toward the call 14.0% of the time (mean move +0.09).
 
 Beating the close consistently is the signal that survives small samples. Winning without it is variance.
 
@@ -777,7 +772,7 @@ Those rows assume the teammate played. When he sat, they graded against a line p
 
 ### Closing line value
 
-108 calls have both snapshots. The line moved toward the call 31.5% of the time (mean move +0.72).
+74 calls have both snapshots. The line moved toward the call 33.8% of the time (mean move +0.96).
 
 Beating the close consistently is the signal that survives small samples. Winning without it is variance.
 
@@ -832,18 +827,18 @@ No out-of-sample check yet: it holds out one week at a time and needs at least t
 
 ## Engine props-v1.67
 
-1496 settled calls, 757 winners (50.6%), net -7965 per $100 flat-staked.
+2009 settled calls, 994 winners (49.5%), net -14393 per $100 flat-staked.
 
 ### Calibration: does the model's probability mean anything?
 
 | Model prob | Calls | Hit rate | Stated | Diff | Net/$100 |
 |---|---|---|---|---|---|
-| 50%-55% | 403 | 55.1% | 52.5% | +2.6% | -464 |
-| 55%-60% | 300 | 56.0% | 57.3% | -1.3% | -581 |
-| 60%-65% | 223 | 52.9% | 62.2% | -9.3% | -2024 |
-| 65%-70% | 107 | 52.3% | 67.2% | -14.9% | -1122 |
-| 70%-80% | 72 | 65.3% | 73.7% | -8.4% | +841 |
-| 80%-101% | 14 | 78.6% | 84.9% | -6.3% | +416 |
+| 50%-55% | 521 | 55.1% | 52.5% | +2.5% | -631 |
+| 55%-60% | 426 | 54.2% | 57.3% | -3.1% | -2149 |
+| 60%-65% | 293 | 50.9% | 62.2% | -11.4% | -3797 |
+| 65%-70% | 141 | 51.1% | 67.2% | -16.2% | -1761 |
+| 70%-80% | 97 | 56.7% | 73.7% | -16.9% | -293 |
+| 80%-101% | 20 | 70.0% | 84.8% | -14.8% | +298 |
 
 A bucket needs roughly 50 calls before its hit rate says anything; below that the difference is noise.
 
@@ -851,11 +846,11 @@ A bucket needs roughly 50 calls before its hit rate says anything; below that th
 
 | Tier | Calls | Hit rate | Model said | Book said | Net/$100 |
 |---|---|---|---|---|---|
-| STRONG | 262 | 53.4% | 59.5% | 49.8% | -1097 |
-| MODERATE | 72 | 44.4% | 60.4% | 50.3% | -1585 |
-| LEAN | 201 | 52.7% | 54.4% | 49.9% | -1123 |
-| WEAK | 354 | 56.5% | 63.3% | 49.5% | +417 |
-| UNTIERED | 607 | 46.0% | 41.1% | 43.6% | -4576 |
+| STRONG | 388 | 50.5% | 59.4% | 49.8% | -3666 |
+| MODERATE | 88 | 45.5% | 60.0% | 49.9% | -1654 |
+| LEAN | 265 | 52.1% | 54.4% | 49.9% | -1821 |
+| WEAK | 462 | 53.5% | 63.4% | 49.4% | -1926 |
+| UNTIERED | 806 | 46.3% | 40.7% | 43.4% | -5325 |
 
 WEAK exists on the assumption the book is right when it disagrees sharply. If WEAK hits nearer the model column than the book column, that assumption is costing money and the tier rule should change.
 
@@ -863,12 +858,12 @@ WEAK exists on the assumption the book is right when it disagrees sharply. If WE
 
 | Market | Calls | Hit rate | Model said | Net/$100 |
 |---|---|---|---|---|
-| player_anytime_td [anytime_td_v1] | 315 | 37.1% | 30.8% | -3374 |
-| player_pass_yds | 83 | 48.2% | 55.6% | -1189 |
-| player_reception_yds | 424 | 54.5% | 57.6% | -1270 |
-| player_receptions | 433 | 55.7% | 58.4% | -840 |
-| player_rush_reception_yds | 102 | 52.9% | 58.6% | -572 |
-| player_rush_yds | 139 | 53.2% | 58.9% | -718 |
+| player_anytime_td [anytime_td_v1] | 430 | 37.9% | 30.5% | -3886 |
+| player_pass_yds | 111 | 45.0% | 55.8% | -2207 |
+| player_reception_yds | 567 | 53.4% | 57.5% | -2750 |
+| player_receptions | 579 | 54.9% | 58.3% | -1866 |
+| player_rush_reception_yds | 137 | 48.2% | 59.2% | -1937 |
+| player_rush_yds | 185 | 50.8% | 59.7% | -1747 |
 
 Receptions and receiving yards are the only backtested markets; rushing and anytime TD have no backtest at all, so their rows here are the first evidence either way.
 
@@ -876,8 +871,8 @@ Receptions and receiving yards are the only backtested markets; rushing and anyt
 
 | Teammate Questionable at pricing | Calls | Hit rate | Model said | Net/$100 |
 |---|---|---|---|---|
-| yes | 604 | 50.2% | 51.4% | -3460 |
-| no | 892 | 50.9% | 52.9% | -4505 |
+| yes | 834 | 49.3% | 51.4% | -5694 |
+| no | 1175 | 49.6% | 52.8% | -8699 |
 
 Those rows assume the teammate played. When he sat, they graded against a line priced on the wrong roster; if 'yes' runs apart from 'no', that is the cost.
 
@@ -888,10 +883,11 @@ Those rows assume the teammate played. When he sat, they graded against a line p
 | 5 | 495 | 49.3% | -4130 |
 | 6 | 511 | 51.5% | -1996 |
 | 7 | 490 | 51.0% | -1839 |
+| 8 | 513 | 46.2% | -6429 |
 
 ### Closing line value
 
-640 calls have both snapshots. The line moved toward the call 20.9% of the time (mean move -0.02).
+432 calls have both snapshots. The line moved toward the call 13.9% of the time (mean move +0.16).
 
 Beating the close consistently is the signal that survives small samples. Winning without it is variance.
 
@@ -901,28 +897,28 @@ Receiving calls whose target share the rule raised, lowered, or left alone. If t
 
 | Market | Rule | Calls | Hit rate | Model said | Book said | Mean miss |
 |---|---|---|---|---|---|---|
-| catches | raised | 220 | 57.7% | 57.4% | 50.2% | -0.33 |
-| catches | lowered | 128 | 52.3% | 58.7% | 49.6% | +0.34 |
-| catches | not moved | 85 | 55.3% | 60.8% | 50.1% | -0.04 |
-| receiving yards | raised | 215 | 54.0% | 56.4% | 50.0% | -5.28 |
-| receiving yards | lowered | 124 | 55.6% | 58.1% | 50.0% | +3.35 |
-| receiving yards | not moved | 85 | 54.1% | 59.9% | 50.1% | +2.12 |
+| catches | raised | 271 | 55.7% | 57.2% | 50.0% | -0.33 |
+| catches | lowered | 186 | 53.2% | 58.9% | 50.0% | +0.20 |
+| catches | not moved | 122 | 55.7% | 59.9% | 49.9% | +0.07 |
+| receiving yards | raised | 266 | 52.6% | 56.3% | 50.0% | -5.33 |
+| receiving yards | lowered | 180 | 57.2% | 58.2% | 50.0% | +3.23 |
+| receiving yards | not moved | 121 | 49.6% | 59.4% | 50.0% | +2.80 |
 
 A group needs about 50 calls before its numbers say anything.
 
 ## Round 39 reversal check: rushing yards with market carries vs without
 
-139 settled lines, 42 games. Board minus shadow, positive = the shadow is better:
-- Log loss: board 0.7136, shadow 0.7333; difference -0.0196 (95% CI -0.0339 to -0.0073)
-- Brier score: board 0.2592, shadow 0.2686; difference -0.0094 (95% CI -0.0161 to -0.0034)
+185 settled lines, 56 games. Board minus shadow, positive = the shadow is better:
+- Log loss: board 0.7373, shadow 0.7526; difference -0.0153 (95% CI -0.0269 to -0.0032)
+- Brier score: board 0.2697, shadow 0.2769; difference -0.0072 (95% CI -0.0127 to -0.0015)
 
 The board's number stays the price until a pre-set review says otherwise.
 
 ## Round 34 reversal check: receiving at target spread 60 vs 40
 
-857 settled lines, 42 games. Board minus shadow, positive = the shadow is better:
-- Log loss: board 0.6845, shadow 0.6833; difference +0.0011 (95% CI -0.0006 to +0.0029)
-- Brier score: board 0.2457, shadow 0.2451; difference +0.0005 (95% CI -0.0003 to +0.0014)
+1146 settled lines, 56 games. Board minus shadow, positive = the shadow is better:
+- Log loss: board 0.6912, shadow 0.6905; difference +0.0007 (95% CI -0.0009 to +0.0024)
+- Brier score: board 0.2489, shadow 0.2486; difference +0.0003 (95% CI -0.0004 to +0.0012)
 
 The board's number stays the price until a pre-set review says otherwise.
 
@@ -932,25 +928,25 @@ No marked line has been graded yet.
 
 ### Market blend (shadow: nothing priced from it)
 
-315 settled anytime_td_v1 calls; books sleeper (an intercept per book; the intercept row below is sleeper's).
+430 settled anytime_td_v1 calls; books sleeper (an intercept per book; the intercept row below is sleeper's).
 
 | term | weight | 95% CI (game-clustered) |
 |---|---|---|
-| intercept | +0.211 | (-0.251, +0.700) |
-| logit(model) | +1.162 | (+0.399, +1.933) |
-| logit(market) | -0.427 | (-1.371, +0.445) |
+| intercept | +0.269 | (-0.095, +0.674) |
+| logit(model) | +0.931 | (+0.251, +1.537) |
+| logit(market) | -0.055 | (-0.816, +0.746) |
 
-Leave-one-week-out log loss on the same calls: model 0.6422, market 0.6445, blend 0.6505 (315 calls).
+Leave-one-week-out log loss on the same calls: model 0.6466, market 0.6422, blend 0.6444 (430 calls).
 
-1181 settled yardage calls (receptions, receiving, rushing and QB passing yards); books sleeper (an intercept per book and per market; the intercept row below is sleeper's).
+1579 settled yardage calls (receptions, receiving, rushing and QB passing yards); books sleeper (an intercept per book and per market; the intercept row below is sleeper's).
 
 | term | weight | 95% CI (game-clustered) |
 |---|---|---|
-| intercept | -0.116 | (-0.533, +0.326) |
-| logit(model) | +0.188 | (-0.473, +0.793) |
-| logit(market) | +1.573 | (+0.630, +2.677) |
+| intercept | -0.186 | (-0.551, +0.165) |
+| logit(model) | -0.056 | (-0.589, +0.447) |
+| logit(market) | +1.767 | (+0.975, +2.567) |
 
-Leave-one-week-out log loss on the same calls: model 0.6925, market 0.6866, blend 0.6883 (1181 calls).
+Leave-one-week-out log loss on the same calls: model 0.7038, market 0.6867, blend 0.6895 (1579 calls).
 
 ## Bet journal
 
