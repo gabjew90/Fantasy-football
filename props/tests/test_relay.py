@@ -87,6 +87,16 @@ def test_only_a_close_run_counts_as_having_taken_the_closing_line():
     assert relay.next_wait(SLATE[:1], started, started) is None
 
 
+def test_a_queued_tick_reads_the_branch_tip_not_its_trigger_commit():
+    """A relay hop and a cron tick a minute apart queue on `props-record`; the second checked out the
+    commit that triggered it, missed the first one's open marker and record, redid the sweep and
+    failed its push on add/add conflicts (run 42120893670, 2026-11-05)."""
+    text = (PROPS.parent / ".github" / "workflows" / "props.yml").read_text(encoding="utf-8")
+    tick = text.split("\n  tick:\n", 1)[1].split("\n  close-relay:\n", 1)[0]
+    checkout = tick.split("- uses: actions/checkout@v4", 1)[1].split("\n      - ", 1)[0]
+    assert "ref: ${{ github.ref_name }}" in checkout
+
+
 def test_a_schedule_failure_never_fails_the_run(monkeypatch, capsys):
     def boom(_season):
         raise OSError("no schedule")

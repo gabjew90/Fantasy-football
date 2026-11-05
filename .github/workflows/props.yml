@@ -55,11 +55,19 @@ jobs:
     outputs:
       snapshot_type: ${{ steps.guard.outputs.snapshot_type }}
     steps:
+      # The branch tip when this job starts, not the commit that triggered the run: a tick queued
+      # behind another on `props-record` must see that run's record and marks, or it redoes the
+      # same sweep and its push conflicts (run 42120893670, 2026-11-05).
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref_name }}
 
       - name: window guard (stdlib only, no deps installed yet)
         id: guard
-        run: python3 props/guard.py >> "$GITHUB_OUTPUT"
+        run: |
+          # the commit this run read, which can be newer than the run's headSha (see the checkout)
+          echo "checked out $(git rev-parse HEAD)"
+          python3 props/guard.py >> "$GITHUB_OUTPUT"
         env:
           PROPS_MODE: ${{ github.event.inputs.mode }}
           PROPS_SEASON: ${{ github.event.inputs.season }}
