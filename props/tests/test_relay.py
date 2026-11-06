@@ -6,6 +6,7 @@ import contextlib
 import datetime as dt
 import io
 import json
+import re
 import sys
 from pathlib import Path
 
@@ -77,14 +78,35 @@ def test_a_kickoff_too_close_to_capture_is_skipped():
 
 
 def test_only_a_close_run_counts_as_having_taken_the_closing_line():
-    """The workflow hands over the start time of a `close` run only. An opening sweep 45 minutes out
-    took no closing line, so that kickoff still gets its hop."""
+    """The workflow hands over the time a `close` run's guard judged the window, and only for a close
+    run. An opening sweep 45 minutes out took no closing line, so that kickoff still gets its hop."""
     text = (PROPS.parent / ".github" / "workflows" / "props.yml").read_text(encoding="utf-8")
-    assert "needs.tick.outputs.snapshot_type == 'close' && github.run_started_at" in text
+    assert "needs.tick.outputs.snapshot_type == 'close' && needs.tick.outputs.judged_at" in text
+    assert "judged_at: ${{ steps.guard.outputs.judged_at }}" in text
     assert "continue-on-error: true" in text
     started = EARLY - dt.timedelta(minutes=45)
     assert relay.next_wait(SLATE[:1], started, None) == 0.0
     assert relay.next_wait(SLATE[:1], started, started) is None
+
+
+def test_the_guard_hands_the_relay_the_clock_it_judged_by(monkeypatch):
+    """It read github.run_started_at, which GitHub does not have: it rendered empty, so every close
+    hop dispatched again at once, every two minutes until 10 minutes before kickoff (CHI@SEA,
+    2026-11-03 00:57-01:05 UTC). The guard emits its own `now`, so a run it judged close at exactly
+    the window's edge is one the relay also counts as inside it."""
+    judged = EARLY - dt.timedelta(minutes=guard.CLOSE_WINDOW_MIN)
+    out = _guard_outputs(monkeypatch, judged, {"PROPS_MODE": "auto", "FORCED": "1"})
+    assert out["snapshot_type"] == "close"
+    parsed = relay._utc(out["judged_at"])
+    assert parsed == judged
+    assert relay.next_wait(SLATE[:1], judged + dt.timedelta(minutes=3), parsed) is None
+
+
+def test_no_workflow_reads_a_github_value_that_does_not_exist():
+    """An unknown property of the github context renders empty without an error; this one silently
+    broke the relay's stop and froze the nflverse cache key for weeks."""
+    for wf in (PROPS.parent / ".github" / "workflows").glob("*.yml"):
+        assert not re.search(r"\$\{\{[^}]*run_started_at", wf.read_text(encoding="utf-8")), wf.name
 
 
 def test_a_queued_tick_reads_the_branch_tip_not_its_trigger_commit():

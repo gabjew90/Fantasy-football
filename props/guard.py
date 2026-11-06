@@ -204,6 +204,8 @@ def kickoff_utc(row: dict) -> dt.datetime | None:
 
 def main() -> int:
     now = dt.datetime.now(dt.timezone.utc)
+    # the clock every decision below used; the relay reads it to know a closing line was taken
+    emit(judged_at=now.isoformat())
     forced = bool(os.environ.get("FORCED"))
     mode = (os.environ.get("PROPS_MODE") or "").strip() or None
     season = int(os.environ.get("PROPS_SEASON") or 0) or season_of(now)

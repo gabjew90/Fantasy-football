@@ -54,6 +54,7 @@ jobs:
       cancel-in-progress: false
     outputs:
       snapshot_type: ${{ steps.guard.outputs.snapshot_type }}
+      judged_at: ${{ steps.guard.outputs.judged_at }}
     steps:
       # The branch tip when this job starts, not the commit that triggered the run: a tick queued
       # behind another on `props-record` must see that run's record and marks, or it redoes the
@@ -88,7 +89,9 @@ jobs:
         uses: actions/cache@v4
         with:
           path: props/.cache
-          key: props-nflverse-${{ github.run_started_at }}
+          # github.run_started_at does not exist (it rendered empty), so this key was the constant
+          # `props-nflverse-` and the cache was never saved again after its first run
+          key: props-nflverse-${{ github.run_id }}
           restore-keys: props-nflverse-
 
       - name: boundary tests
@@ -246,7 +249,9 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           # only a `close` run took a closing line; an opening sweep or an operator's capture did not
-          CLOSE_CAPTURED_AT: ${{ needs.tick.outputs.snapshot_type == 'close' && github.run_started_at || '' }}
+          # (it read github.run_started_at until 2026-11-05: no such value, always empty, so every close
+          # hop relayed again at once until 10 minutes before kickoff)
+          CLOSE_CAPTURED_AT: ${{ needs.tick.outputs.snapshot_type == 'close' && needs.tick.outputs.judged_at || '' }}
         run: |
           WAIT=$(python3 props/relay.py wait)
           if [ -n "$WAIT" ]; then
