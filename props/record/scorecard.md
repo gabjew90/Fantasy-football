@@ -1,6 +1,6 @@
 # Props scorecard — 2026
 
-5077 calls (5859 priced lines graded, so 782 superseded by a later line).
+5580 calls (6698 priced lines graded, so 1118 superseded by a later line).
 
 **11 pricing models in the record (props-v1.3, props-v1.26, props-v1.0, props-v1.1, props-v1.31, props-v1.25, props-v1.7, props-v1.18, props-v1.28, props-v1.55, props-v1.67); they are not pooled.** Pass `--pool` to pool them explicitly.
 
@@ -20,21 +20,21 @@ The research board shows no bet labels. The gate is decided only at the reviews 
 | props-v1.18 | 292 | 3-3 | not estimated below 300 calls | none yet (first after week 8) | — | — | closed |
 | props-v1.28 | 395 | 4-4 | +0.520 (-0.215, +1.143) | none yet (first after week 8) | — | — | closed |
 | props-v1.55 | 305 | 5-5 | -0.015 (-0.950, +1.223) | none yet (first after week 8) | — | — | closed |
-| props-v1.67 (current) | 1579 | 5-8 | -0.056 (-0.589, +0.447) | week 8 (1579 calls) | -0.056 (-0.710, +0.565) | -9.2 (-22.6, +4.9), 387 bets | closed |
-| all models, pooled (context only) | 3914 | 2-8 | +0.030 (-0.284, +0.338) | week 8 (3914 calls) | +0.030 (-0.325, +0.395) | -12.5 (-21.3, -3.2), 971 bets | closed |
+| props-v1.67 (current) | 1971 | 5-9 | +0.117 (-0.290, +0.526) | week 8 (1579 calls) | -0.056 (-0.710, +0.565) | -9.2 (-22.6, +4.9), 387 bets | closed |
+| all models, pooled (context only) | 4306 | 2-9 | +0.095 (-0.190, +0.395) | week 8 (3914 calls) | +0.030 (-0.325, +0.395) | -12.5 (-21.3, -3.2), 971 bets | closed |
 
 ## Sleeper against DraftKings/FanDuel
 
 Not the model: when Sleeper's line or price, quoted at the time of the DraftKings/FanDuel snapshot (within 15 minutes), sits off their consensus, the side the consensus favours, bet at Sleeper's price (reports/sleeper_vs_books.md; same-time since DECISIONS #252).
 
-Coverage: 2343 player-markets with a DraftKings/FanDuel consensus; 1937 with a Sleeper quote within 15 minutes of it; 1598 of those with a settled result (the engine priced the player).
+Coverage: 2840 player-markets with a DraftKings/FanDuel consensus; 2065 with a Sleeper quote within 15 minutes of it; 1672 of those with a settled result (the engine priced the player).
 
 | Discrepancy | Bets | Won | Win rate | Break-even | Net per $100 (95% CI) |
 |---|---|---|---|---|---|
-| line off | 76 | 55 | 72.4% | 64.9% | +10.7 (-1.5, +23.6) |
-| both, pooled | 76 | 55 | 72.4% | 64.9% | +10.7 (-1.1, +24.1) |
+| line off | 81 | 58 | 71.6% | 65.0% | +9.4 (-5.1, +23.1) |
+| both, pooled | 81 | 58 | 71.6% | 65.0% | +9.4 (-3.3, +22.8) |
 
-76 graded discrepancies: no verdict yet: the rule needs 200+ bets and an interval above zero.
+81 graded discrepancies: no verdict yet: the rule needs 200+ bets and an interval above zero.
 
 ## Engine props-v1.3
 
@@ -827,18 +827,18 @@ No out-of-sample check yet: it holds out one week at a time and needs at least t
 
 ## Engine props-v1.67
 
-2009 settled calls, 994 winners (49.5%), net -14393 per $100 flat-staked.
+2504 settled calls, 1252 winners (50.0%), net -16315 per $100 flat-staked.
 
 ### Calibration: does the model's probability mean anything?
 
 | Model prob | Calls | Hit rate | Stated | Diff | Net/$100 |
 |---|---|---|---|---|---|
-| 50%-55% | 521 | 55.1% | 52.5% | +2.5% | -631 |
-| 55%-60% | 426 | 54.2% | 57.3% | -3.1% | -2149 |
-| 60%-65% | 293 | 50.9% | 62.2% | -11.4% | -3797 |
-| 65%-70% | 141 | 51.1% | 67.2% | -16.2% | -1761 |
-| 70%-80% | 97 | 56.7% | 73.7% | -16.9% | -293 |
-| 80%-101% | 20 | 70.0% | 84.8% | -14.8% | +298 |
+| 50%-55% | 647 | 53.8% | 52.5% | +1.2% | -2155 |
+| 55%-60% | 531 | 55.9% | 57.4% | -1.4% | -896 |
+| 60%-65% | 364 | 52.7% | 62.3% | -9.5% | -3466 |
+| 65%-70% | 188 | 52.7% | 67.3% | -14.6% | -1930 |
+| 70%-80% | 122 | 59.8% | 73.7% | -13.9% | +173 |
+| 80%-101% | 26 | 73.1% | 84.4% | -11.3% | +550 |
 
 A bucket needs roughly 50 calls before its hit rate says anything; below that the difference is noise.
 
@@ -846,24 +846,27 @@ A bucket needs roughly 50 calls before its hit rate says anything; below that th
 
 | Tier | Calls | Hit rate | Model said | Book said | Net/$100 |
 |---|---|---|---|---|---|
-| STRONG | 388 | 50.5% | 59.4% | 49.8% | -3666 |
-| MODERATE | 88 | 45.5% | 60.0% | 49.9% | -1654 |
-| LEAN | 265 | 52.1% | 54.4% | 49.9% | -1821 |
-| WEAK | 462 | 53.5% | 63.4% | 49.4% | -1926 |
-| UNTIERED | 806 | 46.3% | 40.7% | 43.4% | -5325 |
+| STRONG | 494 | 53.0% | 59.5% | 49.9% | -2499 |
+| MODERATE | 102 | 45.1% | 59.9% | 49.7% | -1969 |
+| LEAN | 335 | 51.6% | 54.4% | 49.9% | -2653 |
+| WEAK | 582 | 55.8% | 63.7% | 49.5% | +2 |
+| UNTIERED | 991 | 45.0% | 40.8% | 43.3% | -9196 |
 
 WEAK exists on the assumption the book is right when it disagrees sharply. If WEAK hits nearer the model column than the book column, that assumption is costing money and the tier rule should change.
 
 ### By market
 
+8 anytime-TD calls priced by the v0 fallback or by an unrecorded model are left out of the tables above and shown only here.
+
 | Market | Calls | Hit rate | Model said | Net/$100 |
 |---|---|---|---|---|
-| player_anytime_td [anytime_td_v1] | 430 | 37.9% | 30.5% | -3886 |
-| player_pass_yds | 111 | 45.0% | 55.8% | -2207 |
-| player_reception_yds | 567 | 53.4% | 57.5% | -2750 |
-| player_receptions | 579 | 54.9% | 58.3% | -1866 |
-| player_rush_reception_yds | 137 | 48.2% | 59.2% | -1937 |
-| player_rush_yds | 185 | 50.8% | 59.7% | -1747 |
+| player_anytime_td [anytime_td_v0] | 8 | 37.5% | 38.1% | -291 |
+| player_anytime_td [anytime_td_v1] | 533 | 36.2% | 30.7% | -7136 |
+| player_pass_yds | 138 | 44.2% | 56.2% | -2946 |
+| player_reception_yds | 707 | 54.6% | 57.5% | -1939 |
+| player_receptions | 722 | 56.9% | 58.6% | +282 |
+| player_rush_reception_yds | 174 | 50.0% | 59.2% | -1895 |
+| player_rush_yds | 230 | 49.6% | 60.0% | -2681 |
 
 Receptions and receiving yards are the only backtested markets; rushing and anytime TD have no backtest at all, so their rows here are the first evidence either way.
 
@@ -871,8 +874,8 @@ Receptions and receiving yards are the only backtested markets; rushing and anyt
 
 | Teammate Questionable at pricing | Calls | Hit rate | Model said | Net/$100 |
 |---|---|---|---|---|
-| yes | 834 | 49.3% | 51.4% | -5694 |
-| no | 1175 | 49.6% | 52.8% | -8699 |
+| yes | 972 | 49.8% | 51.6% | -5782 |
+| no | 1532 | 50.1% | 52.9% | -10533 |
 
 Those rows assume the teammate played. When he sat, they graded against a line priced on the wrong roster; if 'yes' runs apart from 'no', that is the cost.
 
@@ -884,10 +887,11 @@ Those rows assume the teammate played. When he sat, they graded against a line p
 | 6 | 511 | 51.5% | -1996 |
 | 7 | 490 | 51.0% | -1839 |
 | 8 | 513 | 46.2% | -6429 |
+| 9 | 495 | 52.1% | -1922 |
 
 ### Closing line value
 
-432 calls have both snapshots. The line moved toward the call 13.9% of the time (mean move +0.16).
+819 calls have both snapshots. The line moved toward the call 10.5% of the time (mean move +0.12).
 
 Beating the close consistently is the signal that survives small samples. Winning without it is variance.
 
@@ -897,28 +901,28 @@ Receiving calls whose target share the rule raised, lowered, or left alone. If t
 
 | Market | Rule | Calls | Hit rate | Model said | Book said | Mean miss |
 |---|---|---|---|---|---|---|
-| catches | raised | 271 | 55.7% | 57.2% | 50.0% | -0.33 |
-| catches | lowered | 186 | 53.2% | 58.9% | 50.0% | +0.20 |
-| catches | not moved | 122 | 55.7% | 59.9% | 49.9% | +0.07 |
-| receiving yards | raised | 266 | 52.6% | 56.3% | 50.0% | -5.33 |
-| receiving yards | lowered | 180 | 57.2% | 58.2% | 50.0% | +3.23 |
-| receiving yards | not moved | 121 | 49.6% | 59.4% | 50.0% | +2.80 |
+| catches | raised | 336 | 56.8% | 57.6% | 50.2% | -0.26 |
+| catches | lowered | 226 | 54.9% | 59.2% | 50.0% | +0.15 |
+| catches | not moved | 160 | 60.0% | 60.0% | 50.2% | -0.06 |
+| receiving yards | raised | 330 | 53.0% | 56.3% | 50.0% | -4.06 |
+| receiving yards | lowered | 220 | 56.8% | 58.2% | 50.0% | +2.77 |
+| receiving yards | not moved | 157 | 54.8% | 58.9% | 50.0% | +1.58 |
 
 A group needs about 50 calls before its numbers say anything.
 
 ## Round 39 reversal check: rushing yards with market carries vs without
 
-185 settled lines, 56 games. Board minus shadow, positive = the shadow is better:
-- Log loss: board 0.7373, shadow 0.7526; difference -0.0153 (95% CI -0.0269 to -0.0032)
-- Brier score: board 0.2697, shadow 0.2769; difference -0.0072 (95% CI -0.0127 to -0.0015)
+230 settled lines, 70 games. Board minus shadow, positive = the shadow is better:
+- Log loss: board 0.7410, shadow 0.7552; difference -0.0142 (95% CI -0.0246 to -0.0047)
+- Brier score: board 0.2717, shadow 0.2785; difference -0.0068 (95% CI -0.0117 to -0.0023)
 
 The board's number stays the price until a pre-set review says otherwise.
 
 ## Round 34 reversal check: receiving at target spread 60 vs 40
 
-1146 settled lines, 56 games. Board minus shadow, positive = the shadow is better:
-- Log loss: board 0.6912, shadow 0.6905; difference +0.0007 (95% CI -0.0009 to +0.0024)
-- Brier score: board 0.2489, shadow 0.2486; difference +0.0003 (95% CI -0.0004 to +0.0012)
+1429 settled lines, 70 games. Board minus shadow, positive = the shadow is better:
+- Log loss: board 0.6827, shadow 0.6824; difference +0.0004 (95% CI -0.0010 to +0.0018)
+- Brier score: board 0.2449, shadow 0.2447; difference +0.0002 (95% CI -0.0005 to +0.0009)
 
 The board's number stays the price until a pre-set review says otherwise.
 
@@ -928,25 +932,25 @@ No marked line has been graded yet.
 
 ### Market blend (shadow: nothing priced from it)
 
-430 settled anytime_td_v1 calls; books sleeper (an intercept per book; the intercept row below is sleeper's).
+533 settled anytime_td_v1 calls; books sleeper (an intercept per book; the intercept row below is sleeper's).
 
 | term | weight | 95% CI (game-clustered) |
 |---|---|---|
-| intercept | +0.269 | (-0.095, +0.674) |
-| logit(model) | +0.931 | (+0.251, +1.537) |
-| logit(market) | -0.055 | (-0.816, +0.746) |
+| intercept | +0.134 | (-0.180, +0.446) |
+| logit(model) | +0.594 | (+0.023, +1.160) |
+| logit(market) | +0.365 | (-0.373, +1.078) |
 
-Leave-one-week-out log loss on the same calls: model 0.6466, market 0.6422, blend 0.6444 (430 calls).
+Leave-one-week-out log loss on the same calls: model 0.6353, market 0.6298, blend 0.6371 (533 calls).
 
-1579 settled yardage calls (receptions, receiving, rushing and QB passing yards); books sleeper (an intercept per book and per market; the intercept row below is sleeper's).
+1971 settled yardage calls (receptions, receiving, rushing and QB passing yards); books sleeper (an intercept per book and per market; the intercept row below is sleeper's).
 
 | term | weight | 95% CI (game-clustered) |
 |---|---|---|
-| intercept | -0.186 | (-0.551, +0.165) |
-| logit(model) | -0.056 | (-0.589, +0.447) |
-| logit(market) | +1.767 | (+0.975, +2.567) |
+| intercept | -0.262 | (-0.607, +0.087) |
+| logit(model) | +0.117 | (-0.290, +0.526) |
+| logit(market) | +1.354 | (+0.739, +2.059) |
 
-Leave-one-week-out log loss on the same calls: model 0.7038, market 0.6867, blend 0.6895 (1579 calls).
+Leave-one-week-out log loss on the same calls: model 0.6979, market 0.6879, blend 0.6881 (1971 calls).
 
 ## Bet journal
 
