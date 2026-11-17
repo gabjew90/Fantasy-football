@@ -25,20 +25,21 @@
   "engine": "props-v1.67",
   "estimated": true,
   "gate_open": false,
-  "hi": 0.526,
+  "hi": 0.39,
   "level": 0.95,
-  "lo": -0.29,
+  "lo": -0.293,
   "model_id": "eec5280951ccd6d79ad81be4fa83cfb857196ce17afd726aecbac37513543d29",
-  "n_calls": 1971,
+  "n_calls": 2392,
   "next_review": 12,
   "review_week": 8,
-  "w_model": 0.117,
+  "w_model": 0.027,
   "weeks": [
    5,
    6,
    7,
    8,
-   9
+   9,
+   10
   ]
  },
  "engines": [
@@ -209,20 +210,21 @@
    "engine": "props-v1.67",
    "estimated": true,
    "gate_open": false,
-   "hi": 0.526,
+   "hi": 0.39,
    "level": 0.95,
-   "lo": -0.29,
+   "lo": -0.293,
    "model_id": "eec5280951ccd6d79ad81be4fa83cfb857196ce17afd726aecbac37513543d29",
-   "n_calls": 1971,
+   "n_calls": 2392,
    "next_review": 12,
    "review_week": 8,
-   "w_model": 0.117,
+   "w_model": 0.027,
    "weeks": [
     5,
     6,
     7,
     8,
-    9
+    9,
+    10
    ]
   }
  ],
@@ -251,13 +253,13 @@
   },
   "estimated": true,
   "gate_open": false,
-  "hi": 0.395,
+  "hi": 0.314,
   "level": 0.95,
-  "lo": -0.19,
-  "n_calls": 4306,
+  "lo": -0.184,
+  "n_calls": 4727,
   "next_review": 12,
   "review_week": 8,
-  "w_model": 0.095,
+  "w_model": 0.051,
   "weeks": [
    2,
    3,
@@ -266,10 +268,11 @@
    6,
    7,
    8,
-   9
+   9,
+   10
   ]
  },
  "rule": "decided only at the week 8, 12, 18 reviews, on the calls through that week: labels return only when the whole 98.3% interval of the model's weight is above zero AND the top-tier calls' net per $100 at Sleeper's recorded prices has its whole 98.3% interval above zero (3 looks share one 5%)",
  "season": 2026,
- "updated_utc": "2026-11-10T16:17:58Z"
+ "updated_utc": "2026-11-17T17:33:55Z"
 }
